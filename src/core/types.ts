@@ -65,11 +65,48 @@ export type Photo = {
   file?: File;
 };
 
+/**
+ * Thông số chỉnh màu.
+ *
+ * Bố cục theo kiểu Lightroom/MagiMir: mỗi thanh chạy -1..1, 0 là không đổi.
+ * Nhờ vậy một bộ thông số lưu lại dùng được cho MỌI ảnh về sau, không phụ
+ * thuộc ảnh nào.
+ *
+ * Các trường ngoài 3 cái đầu đều TUỲ CHỌN — bộ lọc cũ và ảnh đã lưu từ trước
+ * vẫn đọc được, không cần chuyển đổi dữ liệu.
+ */
 export type ColorState = {
   presetId: string;
+
+  // --- Cơ bản ---
   brightness: number;
   contrast: number;
   saturation: number;
+
+  // --- Ánh sáng ---
+  /** Bù sáng tổng thể, nhân theo cấp số nhân như máy ảnh. */
+  exposure?: number;
+  /** Kéo riêng vùng sáng, giữ vùng tối. */
+  highlights?: number;
+  /** Kéo riêng vùng tối, giữ vùng sáng. */
+  shadows?: number;
+  /** Điểm trắng / điểm đen. */
+  white?: number;
+  black?: number;
+
+  // --- Màu ---
+  /** Ấm (+) / lạnh (-). */
+  temperature?: number;
+  /** Ngả lục (-) / ngả hồng (+). */
+  tint?: number;
+  /** Như saturation nhưng chừa màu da lại. */
+  vibrance?: number;
+
+  // --- Chi tiết ---
+  /** Tăng tương phản cục bộ, ảnh trông "đanh" hơn. */
+  clarity?: number;
+  /** Làm mịn da: giảm chi tiết nhỏ ở vùng màu da. */
+  smoothSkin?: number;
 };
 
 export const DEFAULT_COLOR: ColorState = {

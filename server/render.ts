@@ -6,7 +6,8 @@ import { listPhotos } from './capture.ts';
 import type { Session } from './session.ts';
 import { resolveImagePlacement, slotRectPx } from '../src/core/placement.ts';
 import { framePx } from '../src/core/format.ts';
-import { PRESETS } from '../src/render/color.ts';
+import { applyColor, isIdentity } from '../src/render/color.ts';
+import type { ColorState } from '../src/core/types.ts';
 
 /**
  * Dựng lại ảnh ghép ở server, từ ẢNH GỐC máy chụp.
@@ -38,60 +39,41 @@ export type Recipe = {
   }>;
 };
 
-const LUMA_R = 0.2126;
-const LUMA_G = 0.7152;
-const LUMA_B = 0.0722;
-
-/**
- * Áp màu lên buffer RGB thô.
+/*
+ * Chỉnh màu dùng LẠI applyColor của app, không viết lại.
  *
- * Cùng thứ tự phép toán với src/render/color.ts: matrix -> saturation ->
- * brightness -> contrast. Hằng số preset lấy thẳng từ PRESETS nên thêm bộ lọc
- * mới ở client là server tự có theo.
+ * Trước đây chỗ này là bản cài đặt thứ hai của cùng phép toán — đúng thứ
+ * README cảnh báo phải tránh. Thêm một thanh chỉnh mới ở client mà quên sửa
+ * ở đây thì ảnh khách tải về sẽ khác ảnh khách thấy.
+ *
+ * applyColor nhận ImageData; ở Node không có sẵn nên dựng một vật thể cùng
+ * hình dạng — nó chỉ đọc .data, .width, .height.
  */
 function applyColorRaw(
   data: Buffer,
+  width: number,
+  height: number,
   channels: number,
   c: NonNullable<Recipe['color']>,
 ): void {
-  const preset = PRESETS.find((p) => p.id === c.presetId);
-  const m = preset?.matrix;
-  const sat = 1 + c.saturation + (preset?.saturation ?? 0);
-  const bright = (c.brightness + (preset?.brightness ?? 0)) * 255;
-  const contrast = 1 + c.contrast + (preset?.contrast ?? 0);
-
-  for (let i = 0; i < data.length; i += channels) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-
-    if (m) {
-      const nr = r * m[0] + g * m[1] + b * m[2];
-      const ng = r * m[3] + g * m[4] + b * m[5];
-      const nb = r * m[6] + g * m[7] + b * m[8];
-      r = nr; g = ng; b = nb;
-    }
-    if (sat !== 1) {
-      const lum = r * LUMA_R + g * LUMA_G + b * LUMA_B;
-      r = lum + (r - lum) * sat;
-      g = lum + (g - lum) * sat;
-      b = lum + (b - lum) * sat;
-    }
-    if (bright !== 0) { r += bright; g += bright; b += bright; }
-    if (contrast !== 1) {
-      r = (r - 128) * contrast + 128;
-      g = (g - 128) * contrast + 128;
-      b = (b - 128) * contrast + 128;
-    }
-
-    data[i] = r < 0 ? 0 : r > 255 ? 255 : r;
-    data[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g;
-    data[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+  if (channels === 4) {
+    applyColor(
+      { data: data as unknown as Uint8ClampedArray, width, height } as ImageData,
+      c as ColorState,
+    );
+    return;
+  }
+  // sharp có thể trả 3 kênh; applyColor bước 4 nên phải đệm thêm alpha
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0, j = 0; i < data.length; i += channels, j += 4) {
+    rgba[j] = data[i]; rgba[j + 1] = data[i + 1]; rgba[j + 2] = data[i + 2];
+    rgba[j + 3] = 255;
+  }
+  applyColor({ data: rgba, width, height } as ImageData, c as ColorState);
+  for (let i = 0, j = 0; i < data.length; i += channels, j += 4) {
+    data[i] = rgba[j]; data[i + 1] = rgba[j + 1]; data[i + 2] = rgba[j + 2];
   }
 }
-
-const isIdentity = (c?: Recipe['color']) =>
-  !c || (c.presetId === 'none' && !c.brightness && !c.contrast && !c.saturation);
 
 /**
  * Render một dải ảnh từ recipe + ảnh gốc.
@@ -176,10 +158,11 @@ export async function renderFromOriginals(
   let out = await canvas.composite(layers).png().toBuffer();
 
   // Chỉnh màu áp lên ảnh, TRƯỚC khi đặt khung lên — khung giữ màu thiết kế
-  if (!isIdentity(recipe.color)) {
+  // isIdentity nhập từ color.ts — tự bao gồm mọi thanh mới
+  if (recipe.color && !isIdentity(recipe.color as ColorState)) {
     const { data, info } = await sharp(out).raw()
       .toBuffer({ resolveWithObject: true });
-    applyColorRaw(data, info.channels, recipe.color!);
+    applyColorRaw(data, info.width, info.height, info.channels, recipe.color!);
     out = await sharp(data, {
       raw: { width: info.width, height: info.height, channels: info.channels },
     }).png().toBuffer();

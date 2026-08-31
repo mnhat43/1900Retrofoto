@@ -3,6 +3,9 @@
 Hệ thống photobooth chạy **hoàn toàn trong mạng LAN cửa hàng** — không cloud,
 không tài khoản bên ngoài, không chi phí. Ảnh không rời khỏi máy chủ của bạn.
 
+> **Dựng trên máy mới?** Làm theo [CAI-DAT.md](CAI-DAT.md) — hướng dẫn từng
+> bước, khoảng 30–45 phút. File này thiên về giải thích cách hệ thống hoạt động.
+
 ## Luồng hoạt động
 
 ```

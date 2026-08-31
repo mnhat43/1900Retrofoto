@@ -156,6 +156,15 @@ export default function RoomApp() {
             Hãy tải ảnh về máy <b>trước khi rời quán</b> — liên kết chỉ dùng
             được trong WiFi cửa hàng.
           </p>
+
+          {/*
+            Buồng đã rảnh ngay khi bấm "Đã chụp xong". Nói rõ để khách biết
+            cứ cầm điện thoại ra ngoài ngồi ghép, không phải đứng chiếm phòng.
+          */}
+          <p className="free-note">
+            Bạn có thể <b>ra ngoài ngồi ghép ảnh</b> — phòng đã sẵn sàng cho
+            khách tiếp theo.
+          </p>
         </div>
       </div>
     );

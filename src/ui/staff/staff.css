@@ -49,8 +49,16 @@
   min-height: 0;
 }
 
-/* Cột trái tự cuộn nếu quá nhiều phòng — hiếm, nhưng không được tràn */
-.col-left { overflow-y: auto; }
+/*
+ * Cột trái: thẻ PHÒNG co lại và tự cuộn, thẻ TẠO GÓI CHỤP luôn nguyên vẹn.
+ *
+ * Từ khi phòng hiện thêm dòng "đang ghép ảnh", danh sách phòng dài ra và
+ * từng đẩy nút "Tạo mã" xuống dưới mép màn 1024x700. Nút đó nhân viên bấm
+ * cả ngày nên phải luôn thấy; danh sách phòng thì cuộn được.
+ */
+.col-left { min-height: 0; overflow: hidden; }
+.col-left > section:first-child { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+.col-left > section:last-child { flex: 0 0 auto; }
 
 /*
  * Cột phải: khối ngày co lại vừa chỗ, thanh phân trang luôn ở đáy.
@@ -985,3 +993,170 @@ button.link.danger { color: var(--danger); }
   button.link { min-height: 40px; padding: 8px 10px; }
   .pkg { min-height: 42px; }
 }
+
+/* ---------- Bộ chỉnh màu ---------- */
+
+.color-work {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: clamp(16px, 2.5vw, 28px);
+  align-items: start;
+}
+
+.color-preview {
+  display: grid;
+  place-items: center;
+  min-width: 220px;
+  max-width: 380px;
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
+.color-preview canvas {
+  max-width: 100%;
+  max-height: 46vh;
+  border-radius: var(--r-sm);
+  display: block;
+}
+
+/* Ba nhóm thanh xếp ngang khi đủ rộng — chỉnh màu là việc nhìn tổng thể */
+.color-sliders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 4px 20px;
+  align-content: start;
+}
+
+.color-group { min-width: 0; }
+.color-group .field-label { margin-top: 10px; }
+.color-group:first-child .field-label { margin-top: 0; }
+
+/*
+ * Kiểu thanh trượt phải định nghĩa Ở ĐÂY.
+ * .slider gốc nằm trong studio.css — trang nhân viên không nạp file đó, nên
+ * chỉ ghi đè grid-template-columns thì không có tác dụng gì.
+ */
+.color-sliders .slider {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.color-sliders .slider > span { white-space: nowrap; }
+
+.color-sliders .slider b {
+  font-family: var(--mono);
+  text-align: right;
+  font-weight: 500;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.color-sliders .slider input[type=range] {
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.color-sliders input[type=range]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.color-sliders input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.color-sliders input[type=range]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.color-sliders input[type=range]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.color-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.color-actions .primary { margin-top: 0; }
+
+/* Danh sách bộ đã lưu */
+.preset-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preset-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
+.preset-row.off { opacity: .5; }
+.preset-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preset-acts { display: flex; gap: 4px; }
+
+@media (max-width: 900px) {
+  .color-work { grid-template-columns: 1fr; }
+  .color-preview { max-width: none; }
+}
+
+/*
+ * Khách đã rời buồng nhưng còn ghép ảnh.
+ * Nền nhạt hơn thẻ phòng để thấy rõ đây là việc PHỤ — phòng vẫn nhận khách
+ * mới được, dòng này chỉ nhắc còn phiên chưa đóng.
+ */
+.composing {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 5px 10px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.composing button.link { padding: 2px 8px; min-height: 26px; font-size: 12px; }

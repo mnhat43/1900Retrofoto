@@ -8,9 +8,9 @@ import QRCode from 'qrcode';
 import { CONFIG, warnIfInsecure } from './config.ts';
 import { getDb } from './db.ts';
 import {
-  createSession, claimSession, getByToken, activeForRoom,
+  createSession, claimSession, getByToken, activeForRoom, lastDoneForRoom,
   listSessions, setStatus, cancelSession, isLockedOut, getById,
-  closeSession, busySession, sessionByAnyToken,
+  closeSession, busySession, sessionByAnyToken, openSessionsForRoom,
 } from './session.ts';
 import { addPhoto, listPhotos, getPhoto, countPhotos, previewName, CaptureError } from './capture.ts';
 import { saveComposite, listComposites, getBySlug } from './composite.ts';
@@ -25,6 +25,7 @@ import {
 } from './frames.ts';
 import type { DetectedSlot } from './detect.ts';
 import { renderFromOriginals, type Recipe } from './render.ts';
+import { listPresets, createPreset, updatePreset, deletePreset } from './presets.ts';
 import { runCleanup } from './cleanup.ts';
 import { intakeFromFolder, ensureCaptureDir, captureEnabled, captureDir } from './intake.ts';
 
@@ -166,10 +167,16 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     json(res, 200, {
       rooms: CONFIG.rooms.map((id) => {
         const b = busySession(id);
+        // Khách đã ra khỏi buồng nhưng còn đang ghép ảnh ngoài quán.
+        // Nhân viên cần thấy để biết còn phiên nào chưa đóng.
+        const composing = openSessionsForRoom(id);
         return {
           id,
           busy: !!b,
           session: b ? { id: b.id, code: b.code, status: b.status } : null,
+          composing: composing.map((c) => ({
+            id: c.id, code: c.code, status: c.status,
+          })),
         };
       }),
     });
@@ -299,6 +306,51 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     return true;
   }
 
+  // ---- Bộ chỉnh màu ----
+
+  /* Danh sách cho KHÁCH: chỉ bộ đang bật, không cần đăng nhập. */
+  if (path === '/api/color-presets' && method === 'GET') {
+    json(res, 200, { presets: listPresets({ onlyEnabled: true }) });
+    return true;
+  }
+
+  if (path === '/api/staff/color-presets' && method === 'GET') {
+    if (requireStaff(ctx)) return true;
+    json(res, 200, { presets: listPresets() });
+    return true;
+  }
+
+  if (path === '/api/staff/color-presets' && method === 'POST') {
+    if (requireStaff(ctx)) return true;
+    const body = await readJson<{ label?: string; params?: unknown }>(req);
+    try {
+      json(res, 200, { preset: createPreset(String(body.label ?? ''), body.params) });
+    } catch (e) {
+      json(res, 400, { error: e instanceof Error ? e.message : 'Không lưu được' });
+    }
+    return true;
+  }
+
+  if (path.match(/^\/api\/staff\/color-presets\/[^/]+$/) && method === 'PATCH') {
+    if (requireStaff(ctx)) return true;
+    const body = await readJson<{ label?: string; params?: unknown; enabled?: boolean }>(req);
+    try {
+      const p = updatePreset(path.split('/')[4], body);
+      if (!p) { json(res, 404, { error: 'Không tìm thấy' }); return true; }
+      json(res, 200, { preset: p });
+    } catch (e) {
+      json(res, 400, { error: e instanceof Error ? e.message : 'Không sửa được' });
+    }
+    return true;
+  }
+
+  if (path.match(/^\/api\/staff\/color-presets\/[^/]+$/) && method === 'DELETE') {
+    if (requireStaff(ctx)) return true;
+    const ok = deletePreset(path.split('/')[4]);
+    json(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Không tìm thấy' });
+    return true;
+  }
+
   // ---- Phòng chụp ----
   if (path === '/api/room/claim' && method === 'POST') {
     const body = await readJson<{ room?: string; code?: string }>(req);
@@ -328,7 +380,11 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
       json(res, 400, { error: 'Phòng không hợp lệ' });
       return true;
     }
-    const s = activeForRoom(room);
+    /*
+     * Ưu tiên phiên ĐANG CHỤP; không có thì lấy phiên vừa chụp xong để còn
+     * hiện QR. Buồng đã rảnh rồi nhưng khách vừa xong vẫn cần quét mã.
+     */
+    const s = activeForRoom(room) ?? lastDoneForRoom(room);
     if (!s) {
       json(res, 200, {
         session: null,
@@ -338,15 +394,16 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
       });
       return true;
     }
+    const done = s.status === 'done' || s.status === 'composed';
     json(res, 200, {
       session: publicSession(s),
       photos: listPhotos(s.id).map(publicPhoto),
       agent: agentAlive(room),
       captureEnabled: captureEnabled(),
       captureDir: captureEnabled() ? captureDir(s.code) : null,
-      qr: s.status === 'done' || s.status === 'composed'
-        ? await makeQr(ctx, s.access_token)
-        : null,
+      qr: done ? await makeQr(ctx, s.access_token) : null,
+      /* Buồng đã sẵn sàng nhận khách mới — màn hình phòng nói rõ cho nhân viên */
+      roomFree: done,
     });
     return true;
   }

@@ -78,8 +78,11 @@ export const staffSessions = () =>
 
 export type RoomStatus = {
   id: string;
+  /** Còn người đang chụp trong buồng. */
   busy: boolean;
   session: { id: string; code: string; status: string } | null;
+  /** Khách đã ra khỏi buồng nhưng còn đang ghép ảnh ngoài quán. */
+  composing?: Array<{ id: string; code: string; status: string }>;
 };
 
 export const staffRooms = () =>
@@ -245,6 +248,46 @@ export const updateFrame = (
 
 export const deleteFrame = (id: string) =>
   req<{ ok: true }>(`/api/staff/frames/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
+// ---- Bộ chỉnh màu ----
+
+export type ColorPreset = {
+  id: string;
+  label: string;
+  /** ColorState — mọi thanh -1..1 nên áp được cho mọi ảnh. */
+  params: Record<string, number | string>;
+  enabled: boolean;
+};
+
+/** Bộ đang bật, cho khách chọn. */
+export const listColorPresets = () =>
+  req<{ presets: ColorPreset[] }>('/api/color-presets');
+
+/** Đầy đủ, cho nhân viên. */
+export const staffColorPresets = () =>
+  req<{ presets: ColorPreset[] }>('/api/staff/color-presets');
+
+export const createColorPreset = (label: string, params: unknown) =>
+  req<{ preset: ColorPreset }>('/api/staff/color-presets', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ label, params }),
+  });
+
+export const updateColorPreset = (
+  id: string,
+  patch: { label?: string; params?: unknown; enabled?: boolean },
+) =>
+  req<{ preset: ColorPreset }>(`/api/staff/color-presets/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+
+export const deleteColorPreset = (id: string) =>
+  req<{ ok: true }>(`/api/staff/color-presets/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 
 // ---- Khách ----
 

@@ -69,37 +69,62 @@ const right = await api('/api/room/claim', {
 });
 check('phòng 1 nhập được mã của mình', right.status === 200);
 
-console.log('\n--- Khách chụp/ghép xong KHÔNG tự giải phóng phòng ---');
+/*
+ * Chụp xong là BUỒNG RẢNH NGAY.
+ *
+ * Khách cũ cầm QR ra ngoài ngồi ghép ảnh, khách mới vào chụp luôn — không
+ * phải đợi nhân viên đóng phiên. Đây là chỗ tiết kiệm 5-10 phút mỗi lượt.
+ */
+console.log('\n--- Chụp xong: buồng rảnh ngay, khách cũ vẫn ghép được ---');
 await api('/api/room/finish?room=1', { method: 'POST' });
-const stillBusy = await mk('1');
-check('khách chụp xong: phòng VẪN bận',
-  stillBusy.status === 409, JSON.stringify(stillBusy.body));
 
 const rooms = await api('/api/staff/rooms');
-check('trang nhân viên thấy phòng 1 và 2 bận',
-  rooms.body.rooms.filter((r) => r.busy).length === 2,
-  JSON.stringify(rooms.body.rooms.map((r) => [r.id, r.busy])));
+const room1 = rooms.body.rooms.find((r) => r.id === '1');
+check('chụp xong: phòng 1 KHÔNG còn bận', room1?.busy === false,
+  JSON.stringify(room1));
+check('nhân viên thấy phiên đang ghép ảnh', (room1?.composing ?? []).length === 1,
+  JSON.stringify(room1?.composing));
+check('phòng 2 vẫn bận (đang chụp)',
+  rooms.body.rooms.find((r) => r.id === '2')?.busy === true);
 check('phòng 3 còn trống',
   rooms.body.rooms.find((r) => r.id === '3')?.busy === false);
 
-console.log('\n--- Nhân viên đóng phiên thì phòng mới rảnh ---');
+const detailA = await api(`/api/staff/sessions/${a.body.id}`);
+const tokenA = detailA.body.token;
+const guestA = await api(`/api/s?t=${encodeURIComponent(tokenA)}`);
+check('khách vừa chụp xong VẪN mở được QR', guestA.status === 200);
+
+const next = await mk('1');
+check('tạo được mã mới cho phòng ngay', next.status === 200 && !!next.body.code,
+  JSON.stringify(next.body));
+check('mã mới khác mã của khách đang ghép', next.body.code !== a.body.code);
+
+// Khách mới vào chụp -> màn hình phòng phải theo phiên MỚI
+await api('/api/room/claim', {
+  method: 'POST', body: JSON.stringify({ room: '1', code: next.body.code }),
+});
+const roomNow = await api('/api/room/session?room=1');
+check('màn hình phòng hiện phiên ĐANG CHỤP, không phải phiên cũ',
+  roomNow.body.session?.code === next.body.code,
+  `${roomNow.body.session?.code} vs ${next.body.code}`);
+
+console.log('\n--- Nhân viên đóng phiên của khách đã ghép xong ---');
 const closed = await api(`/api/staff/sessions/${a.body.id}/close`, { method: 'POST' });
 check('đóng được phiên', closed.status === 200, JSON.stringify(closed.body));
 
 const freed = await api('/api/staff/rooms');
-check('phòng 1 đã rảnh', freed.body.rooms.find((r) => r.id === '1')?.busy === false);
-
-const next = await mk('1');
-check('tạo được mã mới cho phòng vừa đóng', next.status === 200 && !!next.body.code);
-check('mã mới khác mã cũ', next.body.code !== a.body.code);
+check('phòng 1 vẫn bận vì khách MỚI đang chụp',
+  freed.body.rooms.find((r) => r.id === '1')?.busy === true);
+check('không còn phiên nào đang ghép ở phòng 1',
+  (freed.body.rooms.find((r) => r.id === '1')?.composing ?? []).length === 0);
 
 console.log('\n--- Phiên đã đóng thì khách không truy cập nữa ---');
 // Lay token cua phien da dong qua trang nhan vien
 const detail = await api(`/api/staff/sessions/${a.body.id}`);
-const oldToken = detail.body.token;
-check('nhân viên vẫn xem lại được phiên đã đóng', detail.status === 200 && !!oldToken);
+check('nhân viên vẫn xem lại được phiên đã đóng',
+  detail.status === 200 && !!detail.body.token);
 
-const guest = await api(`/api/s?t=${encodeURIComponent(oldToken)}`);
+const guest = await api(`/api/s?t=${encodeURIComponent(tokenA)}`);
 check('khách KHÔNG mở được QR của phiên đã đóng', guest.status === 404);
 
 console.log('\n--- Thời gian tạo / kết thúc ---');

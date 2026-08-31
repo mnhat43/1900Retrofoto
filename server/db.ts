@@ -113,6 +113,21 @@ function migrate(d: DatabaseSync): void {
     );
     CREATE INDEX IF NOT EXISTS frames_enabled
       ON frames(enabled, sort_order);
+
+    -- Bộ chỉnh màu nhân viên lưu lại để dùng cho những ảnh sau.
+    --
+    -- Cột params là JSON của ColorState: mọi thanh chạy -1..1 nên bộ số áp
+    -- được cho MỌI ảnh, không phụ thuộc ảnh đã dùng lúc chỉnh.
+    CREATE TABLE IF NOT EXISTS color_presets (
+      id         TEXT PRIMARY KEY,
+      label      TEXT NOT NULL,
+      params     TEXT NOT NULL,
+      enabled    INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS color_presets_enabled
+      ON color_presets(enabled, sort_order);
   `);
 
   // --- Nâng cấp database tạo từ bản cũ ---

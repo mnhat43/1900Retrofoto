@@ -13,13 +13,26 @@ export type SessionStatus =
   | 'cancelled';
 
 /**
- * Các trạng thái coi là phòng ĐANG BẬN.
+ * Các trạng thái coi là phòng ĐANG BẬN — tức là còn người đứng trong buồng.
  *
- * Phòng chỉ rảnh khi nhân viên bấm "Đóng phiên" (-> 'closed'), không tự rảnh
- * khi khách ghép xong. Nhờ vậy khách vẫn quét QR xem/ghép lại được trong lúc
- * còn ở quán, và phòng không bị nhận khách mới khi lượt trước chưa dứt điểm.
+ * KHÔNG tính 'done' và 'composed': lúc đó khách đã chụp xong, cầm QR ra ngoài
+ * ngồi ghép ảnh bằng điện thoại. Buồng trống thì phải cho khách sau vào ngay,
+ * không thì mỗi lượt chiếm phòng thêm 5-10 phút chỉ để ngồi chỉnh ảnh.
+ *
+ * "Phòng bận" và "phiên còn sống" là HAI VIỆC KHÁC NHAU:
+ *   - Phòng bận  -> chặn tạo mã mới cho phòng đó (danh sách này)
+ *   - Phiên sống -> QR còn quét được (xem LIVE_STATUSES)
+ * Phiên vẫn sống sau khi phòng đã rảnh, tới khi nhân viên bấm "Đóng phiên".
  */
-export const BUSY_STATUSES = ['active', 'shooting', 'done', 'composed'] as const;
+export const BUSY_STATUSES = ['active', 'shooting'] as const;
+
+/**
+ * Các trạng thái mà QR của khách còn dùng được.
+ *
+ * Rộng hơn BUSY_STATUSES đúng ở 'done' và 'composed' — khách đã rời buồng
+ * nhưng vẫn đang ghép ảnh ngoài quán.
+ */
+export const LIVE_STATUSES = ['created', 'active', 'shooting', 'done', 'composed'] as const;
 
 export type Session = {
   id: string;
@@ -251,11 +264,33 @@ export function getById(id: string): Session | null {
 }
 
 /** Phiên đang mở của một phòng — màn hình phòng poll cái này. */
+/**
+ * Phiên ĐANG CHỤP trong buồng.
+ *
+ * KHÔNG tính 'done'/'composed'. Từ khi phòng rảnh ngay lúc bấm "Đã chụp xong",
+ * một phòng có thể vừa có khách mới đang chụp vừa có khách cũ đang ghép ảnh
+ * ngoài quán. Nếu hàm này còn trả về phiên cũ thì ảnh của khách MỚI sẽ chảy
+ * nhầm vào phiên của khách CŨ.
+ */
 export function activeForRoom(roomId: string): Session | null {
   return (getDb()
     .prepare(
       `SELECT * FROM sessions
-        WHERE room_id = ? AND status IN ('active','shooting','done','composed')
+        WHERE room_id = ? AND status IN ('active','shooting')
+        ORDER BY claimed_at DESC LIMIT 1`,
+    )
+    .get(roomId) as Session | undefined) ?? null;
+}
+
+/**
+ * Phiên vừa chụp xong của phòng — màn hình phòng còn phải hiện QR cho khách
+ * quét, kể cả khi buồng đã sẵn sàng nhận người tiếp theo.
+ */
+export function lastDoneForRoom(roomId: string): Session | null {
+  return (getDb()
+    .prepare(
+      `SELECT * FROM sessions
+        WHERE room_id = ? AND status IN ('done','composed')
         ORDER BY claimed_at DESC LIMIT 1`,
     )
     .get(roomId) as Session | undefined) ?? null;
@@ -290,15 +325,34 @@ export function closeSession(id: string): boolean {
   return res.changes > 0;
 }
 
-/** Phiên đang chiếm phòng (nếu có) — dùng để chặn tạo mã mới cho phòng đó. */
+/**
+ * Phiên đang CHIẾM BUỒNG (nếu có) — dùng để chặn tạo mã mới cho phòng đó.
+ *
+ * 'created' vẫn tính là chiếm: mã đã phát cho khách, họ sắp vào phòng.
+ * 'done'/'composed' thì KHÔNG — khách đã ra ngoài, buồng trống.
+ */
 export function busySession(roomId: string): Session | null {
   return (getDb()
     .prepare(
       `SELECT * FROM sessions
-        WHERE room_id = ? AND status IN ('created','active','shooting','done','composed')
+        WHERE room_id = ? AND status IN ('created','active','shooting')
         ORDER BY created_at DESC LIMIT 1`,
     )
     .get(roomId) as Session | undefined) ?? null;
+}
+
+/**
+ * Phiên chưa đóng của một phòng, KỂ CẢ khách đã ra ngoài đang ghép ảnh.
+ * Trang nhân viên dùng cái này để hiện "còn X khách đang ghép".
+ */
+export function openSessionsForRoom(roomId: string): Session[] {
+  return getDb()
+    .prepare(
+      `SELECT * FROM sessions
+        WHERE room_id = ? AND status IN ('done','composed')
+        ORDER BY created_at DESC`,
+    )
+    .all(roomId) as Session[];
 }
 
 export function cancelSession(id: string): void {

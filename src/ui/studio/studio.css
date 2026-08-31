@@ -790,3 +790,18 @@ body {
   .align-sliders { width: 100%; }
   .align-sliders .slider { grid-template-columns: 74px 1fr 40px; }
 }
+
+/*
+ * Bộ lọc của quán — nổi bật hơn bộ dựng sẵn.
+ * Đây là tone quán muốn khách dùng, nên phải nhận ra ngay giữa 16 chip khác.
+ */
+.chip.shop {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.chip.shop.on {
+  background: var(--accent);
+  color: var(--on-accent);
+}

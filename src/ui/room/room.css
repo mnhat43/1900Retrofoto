@@ -398,3 +398,20 @@ body {
   max-width: min(640px, 92vw);
   margin: 0;
 }
+
+/*
+ * Nhắc khách ra ngoài ngồi ghép ảnh.
+ * Màu xanh (ok) chứ không phải vàng cảnh báo — đây là tin tốt, không phải
+ * lời cảnh báo như dòng "tải ảnh trước khi rời quán" ngay trên.
+ */
+.free-note {
+  margin: clamp(6px, 1.2vh, 12px) 0 0;
+  padding: clamp(7px, 1.3vh, 11px) clamp(14px, 2vw, 20px);
+  background: var(--ok-soft);
+  border: 1px solid var(--ok);
+  border-radius: var(--r);
+  color: var(--ok);
+  font-size: clamp(13px, 1.8vh, 15px);
+  text-align: center;
+  max-width: 640px;
+}

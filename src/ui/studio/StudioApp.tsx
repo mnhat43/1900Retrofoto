@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  guestSession, photoUrl, compositeUrl, saveComposite, listFrames,
+  guestSession, photoUrl, compositeUrl, saveComposite, listFrames, listColorPresets,
   type SessionInfo, type PhotoInfo, type CompositeInfo, type ApiFrame,
+  type ColorPreset,
 } from '../../api';
 import { loadPhotosFromUrls, loadOverlay } from '../../media/assets';
 import { framePx, type FormatId } from '../../core/format';
@@ -52,6 +53,9 @@ export default function StudioApp() {
   const [available, setAvailable] = useState<PhotoInfo[]>([]);
   const [photos, setPhotos] = useState<Map<string, Photo>>(new Map());
   const [frames, setFrames] = useState<Frame[]>([]);
+  const [shopPresets, setShopPresets] = useState<ColorPreset[]>([]);
+  /** Bộ của quán đang chọn — tách riêng vì nó thay cả bộ thông số. */
+  const [shopId, setShopId] = useState<string | null>(null);
   const [frame, setFrame] = useState<Frame | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
   const [contents, setContents] = useState<Map<string, SlotContent>>(new Map());
@@ -66,11 +70,12 @@ export default function StudioApp() {
     if (!token) { setError('Liên kết không hợp lệ'); setStep('error'); return; }
     // Tải phiên và thư viện khung song song — khung do nhân viên quản lý nên
     // phải hỏi server, không nằm sẵn trong mã nguồn nữa.
-    Promise.all([guestSession(token), listFrames()])
-      .then(([r, fr]) => {
+    Promise.all([guestSession(token), listFrames(), listColorPresets()])
+      .then(([r, fr, cp]) => {
         setSession(r.session);
         setAvailable(r.photos);
         setFrames(fr.frames.map(toFrame));
+        setShopPresets(cp.presets);
         if (r.photos.length === 0) {
           setError('Phiên này chưa có ảnh nào');
           setStep('error');
@@ -528,11 +533,39 @@ export default function StudioApp() {
             ) : (
               <>
                 <div className="presets">
+                  {/*
+                    Bộ của quán đứng TRƯỚC bộ dựng sẵn — đây là tone quán muốn
+                    khách dùng, nên phải thấy đầu tiên mà không phải vuốt.
+
+                    Chọn bộ của quán = thay TOÀN BỘ thông số (giữ presetId
+                    'none'), không chồng lên bộ dựng sẵn: chồng hai lớp thì
+                    kết quả phụ thuộc thứ tự áp và không đoán được.
+                  */}
+                  {shopPresets.map((p) => {
+                    const on = shopId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        className={on ? 'chip shop on' : 'chip shop'}
+                        onClick={() => {
+                          setShopId(on ? null : p.id);
+                          setColor(on
+                            ? DEFAULT_COLOR
+                            : { ...DEFAULT_COLOR, ...(p.params as unknown as ColorState) });
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
                   {PRESETS.map((p) => (
                     <button
                       key={p.id}
-                      className={color.presetId === p.id ? 'chip on' : 'chip'}
-                      onClick={() => setColor({ ...color, presetId: p.id })}
+                      className={!shopId && color.presetId === p.id ? 'chip on' : 'chip'}
+                      onClick={() => {
+                        setShopId(null);
+                        setColor({ ...DEFAULT_COLOR, presetId: p.id });
+                      }}
                     >
                       {p.label}
                     </button>

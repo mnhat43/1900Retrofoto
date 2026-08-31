@@ -6,6 +6,7 @@ import {
   type SessionInfo, type PhotoInfo, type CompositeInfo, type RoomStatus,
 } from '../../api';
 import FramesPanel from './FramesPanel';
+import ColorPanel from './ColorPanel';
 import { useDialog } from './useDialog';
 import './staff.css';
 
@@ -57,7 +58,7 @@ export default function StaffApp() {
   const [maxPhotos, setMaxPhotos] = useState(8);
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
-  const [view, setView] = useState<'sessions' | 'frames'>('sessions');
+  const [view, setView] = useState<'sessions' | 'frames' | 'colors'>('sessions');
   const { ask, dialog } = useDialog();
   const [detail, setDetail] = useState<{
     session: SessionInfo; token: string; photos: PhotoInfo[]; composites: CompositeInfo[];
@@ -196,6 +197,12 @@ export default function StaffApp() {
           >
             Khung ảnh
           </button>
+          <button
+            className={view === 'colors' ? 'on' : ''}
+            onClick={() => setView('colors')}
+          >
+            Chỉnh màu
+          </button>
         </nav>
 
         <button className="ghost" onClick={() => staffLogout().then(() => setLoggedIn(false))}>
@@ -203,7 +210,7 @@ export default function StaffApp() {
         </button>
       </header>
 
-      {view === 'frames' ? <FramesPanel /> : (
+      {view === 'frames' ? <FramesPanel /> : view === 'colors' ? <ColorPanel /> : (
       <div className="cols">
       <div className="col-left">
 
@@ -231,6 +238,24 @@ export default function StaffApp() {
               ) : (
                 <div className="room-free">Trống</div>
               )}
+
+              {/*
+                Khách đã rời buồng nhưng còn ghép ảnh ngoài quán.
+                Phòng vẫn nhận khách mới được — nhắc để nhân viên đừng vội
+                đóng phiên khi khách chưa tải ảnh xong.
+              */}
+              {(r.composing ?? []).map((c) => (
+                <div key={c.id} className="composing">
+                  <span>Mã {c.code} đang ghép ảnh</span>
+                  <button
+                    className="link"
+                    disabled={busy}
+                    onClick={() => onClose(c.id, c.code)}
+                  >
+                    Đóng
+                  </button>
+                </div>
+              ))}
             </div>
           ))}
         </div>

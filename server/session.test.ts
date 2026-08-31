@@ -207,12 +207,59 @@ describe('mỗi phòng một phiên', () => {
     expect(busySession('1')).toBeNull();
   });
 
-  it('khách ghép xong KHÔNG tự giải phóng phòng', async () => {
+  /*
+   * Chụp xong là buồng RẢNH NGAY, không đợi nhân viên đóng phiên.
+   *
+   * Mục đích: khách cũ cầm QR ra ngoài ngồi ghép ảnh, khách mới vào chụp
+   * luôn. Trước đây buồng bị giữ tới khi đóng phiên, mỗi lượt lãng phí
+   * 5-10 phút chỉ để khách ngồi chỉnh ảnh trong buồng.
+   */
+  it('chụp xong thì buồng RẢNH ngay để nhận khách mới', async () => {
     const { busySession } = await import('./session.ts');
     const s = createSession({ maxPhotos: 8, roomId: '1' });
     claimSession('1', s.code);
+
+    getDb().prepare(`UPDATE sessions SET status='done' WHERE id=?`).run(s.id);
+    expect(busySession('1')).toBeNull();
+
     getDb().prepare(`UPDATE sessions SET status='composed' WHERE id=?`).run(s.id);
-    expect(busySession('1')).not.toBeNull();
+    expect(busySession('1')).toBeNull();
+  });
+
+  it('phiên vừa xong VẪN còn sống để khách ghép ảnh ngoài quán', async () => {
+    const { openSessionsForRoom, getByToken } = await import('./session.ts');
+    const s = createSession({ maxPhotos: 8, roomId: '1' });
+    claimSession('1', s.code);
+    getDb().prepare(`UPDATE sessions SET status='done' WHERE id=?`).run(s.id);
+
+    // Buồng rảnh nhưng QR vẫn quét được
+    expect(getByToken(s.access_token)).not.toBeNull();
+    expect(openSessionsForRoom('1').map((x) => x.id)).toContain(s.id);
+  });
+
+  it('đang chụp thì VẪN chặn tạo mã mới', async () => {
+    const { busySession } = await import('./session.ts');
+    const s = createSession({ maxPhotos: 8, roomId: '1' });
+    claimSession('1', s.code);
+    expect(busySession('1')?.id).toBe(s.id);
+  });
+
+  /*
+   * Mã không được cấp lại khi khách cũ còn đang ghép — thư mục ảnh đặt tên
+   * theo mã, trùng mã là ghi đè ảnh của nhau.
+   */
+  it('mã của phiên đang ghép KHÔNG bị cấp lại cho khách mới', async () => {
+    const a = createSession({ maxPhotos: 8, roomId: '1' });
+    claimSession('1', a.code);
+    getDb().prepare(`UPDATE sessions SET status='done' WHERE id=?`).run(a.id);
+
+    const codes = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      const b = createSession({ maxPhotos: 8, roomId: '1' });
+      codes.add(b.code);
+      getDb().prepare(`UPDATE sessions SET status='closed' WHERE id=?`).run(b.id);
+    }
+    expect(codes.has(a.code)).toBe(false);
   });
 
   it('phiên đã đóng thì khách không xem được nữa', async () => {
