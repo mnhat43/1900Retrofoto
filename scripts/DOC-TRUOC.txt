@@ -1,0 +1,72 @@
+========================================
+  1900 RETROFOTO - CAI DAT
+========================================
+
+BUOC 1: Chuot phai vao file  CAI-DAT.bat
+        chon "Run as administrator"
+
+        (Bat buoc phai chon dong nay.
+         Nhap dup binh thuong se bao loi.)
+
+BUOC 2: Dien 4 o hien ra:
+
+        - Mat khau nhan vien: tu dat, tu 4 ky tu
+        - Thu muc luu anh:    de nguyen D:\photobooth
+                              (hoac doi sang o con trong)
+        - Thu muc may anh:    de nguyen D:\Anh
+        - Cong:               de nguyen 8090
+
+BUOC 3: Bam nut "Cai dat"
+
+        Xong. Server chay luon, va tu chay
+        moi lan bat may.
+
+
+========================================
+  CON 2 VIEC PHAI TU LAM
+========================================
+
+1. DAT IP TINH cho may nay
+   Neu khong lam, khi mat dien hoac khoi dong
+   lai router thi IP doi -> moi ma QR da phat
+   cho khach se HONG.
+
+2. TAT CHE DO NGU
+   Settings > System > Power & battery
+   > Screen and sleep > chon Never
+   May ngu la ca he thong chet.
+
+   Xem chi tiet trong file HUONG-DAN.md
+
+
+========================================
+  DUNG HANG NGAY
+========================================
+
+Mo trang quan ly:
+   Nhap dup  Mo-trang-quan-ly.cmd
+   (hoac dung loi tat ngoai man hinh)
+
+Server bi tat:
+   Nhap dup  Chay-server.cmd
+
+
+========================================
+  GAP LOI?
+========================================
+
+"Can chay bang quyen Administrator"
+   -> Chua chuot phai chon Run as administrator.
+      Lam lai buoc 1.
+
+Dien thoai khach khong quet duoc QR
+   -> Dien thoai phai noi WIFI CUA QUAN.
+      Dung 4G se khong vao duoc.
+
+Trang trang, khong hien gi
+   -> Nhan Ctrl + Shift + R trong trinh duyet.
+
+Cong bi chiem
+   -> Chay lai CAI-DAT.bat, doi Cong thanh 8095.
+
+Chi tiet hon: mo file HUONG-DAN.md
