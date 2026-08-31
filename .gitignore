@@ -25,6 +25,9 @@ start-server.cmd
 # Ảnh chụp màn hình lúc kiểm thử
 scratch/
 
+# Gói đóng sẵn — tạo lại bằng scripts/package-app.ps1, không commit 113MB
+build/
+
 # Trình soạn thảo / hệ điều hành
 .vscode/*
 !.vscode/extensions.json

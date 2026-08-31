@@ -5,6 +5,9 @@ không tài khoản bên ngoài, không chi phí. Ảnh không rời khỏi máy
 
 > **Dựng trên máy mới?** Làm theo [CAI-DAT.md](CAI-DAT.md) — hướng dẫn từng
 > bước, khoảng 30–45 phút. File này thiên về giải thích cách hệ thống hoạt động.
+>
+> **Đưa cho người không biết code?** Xem [scripts/dong-goi.md](scripts/dong-goi.md)
+> — đóng gói thành file `.exe` cài đặt, nhấp đúp là chạy.
 
 ## Luồng hoạt động
 
