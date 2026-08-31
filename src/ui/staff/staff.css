@@ -1,0 +1,987 @@
+/* =========================================================================
+   Trang nhân viên — 1900 Retrofoto
+   -------------------------------------------------------------------------
+   Cùng bảng màu với giao diện khách nhưng ưu tiên THAO TÁC NHANH: dùng cả
+   ngày, hàng trăm lần. Thông tin quan trọng đọc được trong một cái liếc.
+   ========================================================================= */
+
+@import '../brand.css';
+
+/*
+ * KHOÁ đúng chiều cao màn hình — cả trang không cuộn.
+ * Danh sách phiên dài thì tự cuộn BÊN TRONG bảng, nên phần tạo mã ở cột trái
+ * và thanh phân trang luôn nhìn thấy mà không phải cuộn đi tìm.
+ */
+.staff {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: clamp(12px, 2vh, 22px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.6vh, 18px);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+/* Màn đăng nhập và màn "Đang tải" không cần khoá */
+.staff.center { height: auto; overflow: visible; }
+
+/*
+ * Hai cột: trái 1/3 là thao tác (phòng + tạo mã), phải 2/3 là danh sách phiên.
+ * Cột trái dính khi cuộn — nhân viên tạo mã được mà không phải cuộn ngược lên.
+ */
+.cols {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 2fr;
+  gap: clamp(10px, 1.6vh, 18px);
+  align-items: stretch;
+}
+
+.col-left,
+.col-right {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.6vh, 18px);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Cột trái tự cuộn nếu quá nhiều phòng — hiếm, nhưng không được tràn */
+.col-left { overflow-y: auto; }
+
+/*
+ * Cột phải: khối ngày co lại vừa chỗ, thanh phân trang luôn ở đáy.
+ * flex-basis 0 để bảng không đẩy thanh phân trang ra ngoài.
+ */
+.col-right > .card { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.col-right > .pager { flex: 0 0 auto; }
+
+/* Vùng cuộn của bảng — chỉ phần này cuộn, tiêu đề ngày đứng yên */
+.table-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+@media (max-width: 900px) {
+  /* Màn hẹp: xếp dọc và cho cuộn bình thường, ép một màn sẽ quá chật */
+  .staff { height: auto; max-height: none; overflow: visible; }
+  .cols { grid-template-columns: 1fr; }
+  .col-left, .col-right { overflow: visible; }
+  .col-right > .card { flex: 0 0 auto; }
+  .table-scroll { overflow: visible; }
+}
+
+.staff.center { min-height: 100dvh; display: grid; place-items: center; padding: 20px; }
+
+.staff > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.staff > header .brand { font-size: 22px; }
+
+.staff h2 {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--text-3);
+  margin: 0 0 clamp(8px, 1.6vh, 14px);
+}
+
+.staff h3 { font-size: 13px; margin: 20px 0 9px; color: var(--text-2); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: clamp(13px, 2.2vh, 20px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Đăng nhập ---------- */
+
+.login {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 36px 32px;
+  width: 340px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.login .brand { font-size: 26px; margin-bottom: 6px; }
+.login p { color: var(--text-2); margin: 0 0 22px; font-size: 14px; }
+
+.login input,
+.note {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: inherit;
+  background: var(--bg);
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+.login input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.login button {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login button:hover { background: var(--accent-hover); }
+
+/* ---------- Mã vừa tạo ----------
+   Đây là thứ nhân viên đọc to cho khách -> phải nổi bật nhất trang. */
+
+.fresh {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: var(--accent-soft);
+  border: 2px solid var(--accent);
+  border-radius: var(--r-lg);
+  padding: 20px 24px;
+}
+
+.fresh > div:first-child { min-width: 0; }
+.fresh p { margin: 0; color: var(--text-2); font-size: 13px; }
+
+.fresh .code {
+  font-family: var(--mono);
+  font-size: 54px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: var(--accent);
+  line-height: 1.15;
+}
+
+.fresh .sub { font-size: 12px; }
+.fresh .dir { margin-top: 7px; }
+
+.fresh .dir code {
+  font-family: var(--mono);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* ---------- Trạng thái phòng ---------- */
+
+/*
+ * Cột trái hẹp -> xếp phòng theo HÀNG NGANG (nhãn trái, mã phải) thay vì
+ * ba thẻ vuông chen nhau. Đọc nhanh hơn và không bị bóp méo.
+ */
+.rooms { display: flex; flex-direction: column; gap: clamp(6px, 1.1vh, 9px); }
+
+.room-card {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: var(--r);
+  padding: clamp(8px, 1.4vh, 11px) 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.room-card.free { background: var(--ok-soft); border-left-color: var(--ok); }
+.room-card.busy { background: var(--accent-soft); border-left-color: var(--accent); }
+
+.room-name {
+  grid-column: 1;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: var(--display);
+}
+
+.room-code {
+  grid-column: 2;
+  grid-row: 1;
+  font-family: var(--mono);
+  font-size: clamp(20px, 3.2vh, 25px);
+  font-weight: 700;
+  letter-spacing: .08em;
+  line-height: 1.1;
+  color: var(--accent);
+}
+
+.room-free {
+  grid-column: 2;
+  color: var(--ok);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Nhãn trạng thái và nút Đóng xuống hàng dưới, canh trái/phải */
+.room-card .badge { grid-column: 1; justify-self: start; }
+
+.btn-close {
+  grid-column: 2;
+  justify-self: end;
+  min-height: 34px;
+  padding: 7px 16px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.btn-close:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.btn-close:disabled { opacity: .45; cursor: not-allowed; }
+
+.warn-box {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  padding: 13px 17px;
+  border-radius: var(--r);
+  margin: 0;
+  font-size: 14px;
+}
+
+.field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin: clamp(9px, 1.7vh, 14px) 0 clamp(5px, 1vh, 7px);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+.field-label:first-of-type { margin-top: 0; }
+
+.pkg-row { display: flex; gap: clamp(6px, .9vh, 8px); flex-wrap: wrap; margin-bottom: 4px; }
+
+.pkg {
+  min-height: clamp(34px, 5vh, 40px);
+  padding: clamp(6px, 1.2vh, 9px) clamp(13px, 1.4vw, 18px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+.pkg:hover:not(:disabled):not(.on) { border-color: var(--accent); }
+
+.pkg.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.pkg:disabled { opacity: .4; cursor: not-allowed; text-decoration: line-through; }
+
+button.primary {
+  min-height: clamp(38px, 5.6vh, 44px);
+  padding: clamp(9px, 1.6vh, 12px) 26px;
+  margin-top: clamp(10px, 1.9vh, 16px);
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+button.primary:disabled { opacity: .45; cursor: not-allowed; }
+
+button.ghost {
+  min-height: 40px;
+  padding: 9px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+
+button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- Cột thời gian ---------- */
+
+/*
+ * Ngày ở trên, giờ ở dưới — gọn hơn viết một dòng, và ngày đọc được ngay
+ * không cần tiêu đề nhóm.
+ */
+.when {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.25;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.when b { font-weight: 700; color: var(--text); font-size: 12.5px; }
+
+/* ---------- Phân trang ---------- */
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px;
+}
+
+.pg {
+  min-height: 38px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+
+.pg:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.pg:disabled { opacity: .35; cursor: not-allowed; }
+
+.pg-info {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Bảng ---------- */
+
+table { width: 100%; border-collapse: collapse; }
+
+th, td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+tbody tr:last-child td { border-bottom: none; }
+
+/* Tiêu đề cột dính khi cuộn bảng — cuộn xuống vẫn biết đang xem cột nào */
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--text-3);
+  font-weight: 700;
+}
+
+td { font-size: 14px; }
+td.right { text-align: right; white-space: nowrap; }
+
+td.mono {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: .1em;
+  font-size: 15px;
+}
+
+td[data-label='Bắt đầu'],
+td[data-label='Kết thúc'] {
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.dash { color: var(--text-3); }
+
+.empty { text-align: center; color: var(--text-3); padding: 24px; margin: 0; }
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.badge.active, .badge.shooting { background: var(--cyan-soft); color: #036a7c; }
+.badge.done { background: var(--ok-soft); color: var(--ok); }
+.badge.composed { background: var(--accent-soft); color: var(--accent); }
+.badge.created { background: var(--warn-soft); color: var(--warn); }
+.badge.closed, .badge.expired, .badge.cancelled {
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+}
+
+button.link:hover:not(:disabled) { background: var(--accent-soft); }
+button.link:disabled { opacity: .4; cursor: not-allowed; }
+button.link.danger { color: #c0392b; }
+
+.error { color: var(--accent); margin: 8px 0; font-size: 14px; }
+
+/* ---------- Modal xem ảnh ---------- */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 23, 32, .55);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 10;
+}
+
+.modal-inner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  max-width: 880px;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-inner header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.modal-inner h2 {
+  font-size: 19px;
+  text-transform: none;
+  letter-spacing: -.02em;
+  color: var(--text);
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 11px;
+}
+
+.thumb {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  text-decoration: none;
+  background: var(--surface-2);
+  transition: border-color .15s;
+}
+
+.thumb:hover { border-color: var(--accent); }
+.thumb img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.thumb.composite img { aspect-ratio: auto; object-fit: contain; max-height: 210px; }
+
+.thumb span {
+  display: block;
+  text-align: center;
+  padding: 7px;
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ---------- Hộp thoại xác nhận ---------- */
+
+/*
+ * Dùng <dialog> nên trình duyệt lo sẵn lớp phủ, bẫy tiêu điểm và phím Esc.
+ * Chỉ cần bỏ khung mặc định rồi tự vẽ lại cho khớp giao diện.
+ */
+.dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  padding: clamp(18px, 3vh, 26px);
+  width: min(420px, calc(100vw - 32px));
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog::backdrop {
+  background: rgba(26, 23, 32, .55);
+  backdrop-filter: blur(3px);
+}
+
+.dialog h2 {
+  /* Ghi đè h2 kiểu nhãn của trang: đây là câu hỏi, phải đọc như câu hỏi */
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: -.01em;
+  color: var(--text);
+  margin: 0 0 10px;
+  text-wrap: balance;
+  /* Tên khung rất dài không được kéo hộp thoại rộng ra ngoài màn hình */
+  overflow-wrap: anywhere;
+}
+
+.dialog-msg {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.dialog-field { display: block; margin-top: 16px; }
+.dialog-field .field-label { margin-top: 0; }
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+/*
+ * Hành động không hoàn tác được.
+ * Viết `button.primary.danger` chứ không phải `.primary.danger`: quy tắc
+ * `button.primary` ở trên có độ ưu tiên cao hơn nên sẽ thắng và nút vẫn hồng.
+ */
+button.primary.danger { background: var(--danger); }
+button.primary.danger:hover:not(:disabled) { background: var(--danger); filter: brightness(1.08); }
+
+/* Nút trong hộp thoại tự căn bằng gap, không cần margin của nút trang chính */
+.dialog-actions button.primary { margin-top: 0; }
+
+/* ---------- Tab chuyển màn ---------- */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+}
+
+.tabs button {
+  min-height: 34px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.tabs button.on {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Quản lý khung ảnh ---------- */
+
+/*
+ * Cùng khuôn khổ không-cuộn của trang: phần đầu và bản xem trước cố định,
+ * chỉ danh sách khung tự cuộn.
+ */
+.frames-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.6vh, 16px);
+}
+
+.frames-head {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.frames-head h2 { margin: 0 0 4px; }
+
+.frame-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: clamp(9px, 1.4vh, 14px);
+  align-content: start;
+}
+
+.frame-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* Khung đã tắt: mờ đi nhưng vẫn đọc và bấm được để bật lại */
+.frame-card.off { opacity: .5; }
+.frame-card.off .frame-card-img { filter: grayscale(1); }
+
+/*
+ * Ca-rô XÁM ĐẬM, không dùng token surface.
+ * Phần lớn khung là nền trắng có lỗ trong suốt; trên ca-rô nhạt thì khung
+ * trắng và lỗ nhìn y hệt nhau, nhân viên không phân biệt được khung nào là
+ * khung nào. Màu cố định vì đây là "nền kiểm tra", không phải bề mặt giao diện.
+ */
+.frame-card-img {
+  position: relative;
+  height: 150px;
+  border-radius: var(--r-sm);
+  background:
+    repeating-conic-gradient(#b9b3c4 0 25%, #8f8899 0 50%)
+    0 0 / 12px 12px;
+  overflow: hidden;
+}
+
+.frame-card-img img {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.frame-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* min-width:0 là bắt buộc: không có nó thì flex item không co lại được
+     dưới bề rộng chữ, nên text-overflow không bao giờ kích hoạt. */
+  min-width: 0;
+}
+
+/* Tên dài -> cắt bằng dấu … thay vì đẩy vỡ thẻ */
+.frame-card-body b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frame-card-actions {
+  display: flex;
+  gap: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.frame-card-actions button { flex: 1; }
+button.link.danger { color: var(--danger); }
+
+/* ---------- Xem trước khung vừa chọn ---------- */
+
+/*
+ * Hai cột: khu nắn ô | thông tin. Thẻ CO THEO NỘI DUNG.
+ *
+ * Khung dải dọc 2×6 và khung vuông 6×6 lệch nhau rất xa về hình dạng, nên để
+ * ảnh tự co theo tỉ lệ file BÊN TRONG một cột đứng yên (200..360px): đổi khung
+ * thì bề ngang thẻ không nhảy, mà khung nào cũng vừa màn. Cột thông tin có bề
+ * rộng tối đa — trước đây nó ăn hết 824px còn lại chỉ để đựng một ô tên và hai
+ * ô số, nhìn rỗng tuếch. Thẻ ôm sát hai cột nên không còn mảng trống nào nằm
+ * trong viền.
+ *
+ * `stretch` để hai cột cao bằng nhau — nhờ đó nút Lưu/Huỷ tụt xuống ngang mép
+ * dưới của ảnh chứ không lửng lơ giữa thẻ.
+ */
+.frame-preview {
+  flex: 0 0 auto;
+  width: fit-content;
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: minmax(200px, 360px) minmax(240px, 380px);
+  gap: clamp(16px, 2.5vw, 28px);
+  align-items: stretch;
+}
+
+/*
+ * Khối nền ca-rô ÔM SÁT vùng ảnh.
+ *
+ * Ảnh nhận cả hai giới hạn max-* và tự giữ tỉ lệ, nên hộp bằng đúng phần ảnh
+ * vẽ ra: khung dọc thành hẹp và cao, khung ngang thành rộng và thấp. Đây là
+ * điều kiện bắt buộc — các ô nắn tay định vị theo % của hộp này, mà đặt chiều
+ * cao cứng rồi để object-fit co ảnh thì hộp cao hơn ảnh và mọi ô lệch đi.
+ *
+ * (Ảnh khung in được luôn to hơn mức này nên không cần phóng lên cho vừa.)
+ */
+.preview-img {
+  position: relative;
+  width: fit-content;
+  /* Cột rộng hơn ảnh (khung dải dọc) -> ảnh nằm giữa cột, không dạt sang trái */
+  margin-inline: auto;
+  background:
+    repeating-conic-gradient(#b9b3c4 0 25%, #8f8899 0 50%)
+    0 0 / 12px 12px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  /* Ảnh phải là block để các ô định vị % khớp đúng vùng ảnh */
+  line-height: 0;
+}
+
+.preview-img img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-height: clamp(240px, 42vh, 400px);
+  max-width: min(360px, 32vw);
+}
+
+/* ---------- Nắn ô bằng chuột ---------- */
+
+/*
+ * Thanh công cụ nằm dưới ảnh nên cột phải đủ rộng cho CHỮ, không chỉ cho ảnh:
+ * khung dải dọc chỉ rộng hơn 130px một chút, cột co sát ảnh thì câu nhắc và
+ * nút xoá bị bóp thành một hai chữ mỗi dòng. Bề rộng cột do .frame-preview
+ * đặt; min-width: 0 để cột chịu co xuống mức tối thiểu đó trên màn hẹp thay vì
+ * cứng theo bề ngang câu nhắc.
+ */
+.slot-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.slot-editor .field-label { margin: 0; }
+
+.se-box {
+  cursor: crosshair;
+  /* Chặn trình duyệt tự kéo-thả ảnh và bôi đen khi đang nắn ô */
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.se-img { pointer-events: none; }
+
+/*
+ * Ô dò được, vẽ đè lên ảnh.
+ * Đây là thứ nhân viên nhìn để quyết định lưu hay huỷ, nên phải nổi bật:
+ * viền nét đứt + số thứ tự đúng thứ tự khách sẽ đặt ảnh.
+ */
+.slot-box {
+  position: absolute;
+  border: 2px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  cursor: move;
+}
+
+/* Ô đang chọn: viền liền và đậm hơn để phân biệt với các ô còn lại */
+.slot-box.on {
+  border-style: solid;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  z-index: 2;
+}
+
+/*
+ * Số thứ tự trên nền ĐẶC.
+ * Chữ trần đặt trên ca-rô thì lẫn vào hoa văn, mà đây đúng là con số nhân
+ * viên phải đọc để đối chiếu với lỗ trên khung.
+ */
+.slot-box::before {
+  content: attr(data-n);
+  /* Số chỉ để đọc — không được nuốt cú bấm khi đang kéo ô */
+  pointer-events: none;
+  min-width: 22px;
+  padding: 3px 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Tay cầm góc dưới-phải để kéo giãn ô */
+.se-handle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: nwse-resize;
+}
+
+.se-hint { margin: 0; }
+
+/*
+ * Hàng "đang chọn ô": LUÔN CÓ MẶT và cao cố định.
+ * Cho hàng hiện lên theo lúc chọn thì mỗi cú bấm vào ô lại đẩy cả phần dưới
+ * nhảy một nhịp — nắn vài ô là chóng mặt.
+ */
+.se-sel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  border-top: 1px solid var(--border);
+}
+
+.se-tag { font-size: 12px; font-weight: 600; color: var(--text-2); }
+
+/* Cột thông tin: nút hành động tụt xuống đáy, ngang mép dưới cột ảnh */
+.preview-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Rộng × cao + nút khớp tỉ lệ, trên một hàng */
+.size-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.size-row .text-input { width: 88px; flex: 0 0 auto; }
+.size-row > span { color: var(--text-3); }
+
+.warn-box.small { font-size: 12px; margin-top: 10px; }
+
+.preview-info > .muted { margin: 12px 0 0; }
+
+.text-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+/* Nút vừa nội dung — kéo dài hết cột phải trông như thanh công cụ, không như nút */
+.preview-actions {
+  display: flex;
+  gap: 8px;
+  /* auto: đẩy xuống đáy cột, nhưng vẫn cách phần chữ ở trên khi cột ngắn */
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.preview-actions .primary { flex: 0 0 auto; min-width: 150px; }
+
+/* Màn hẹp: xếp dọc, ảnh và thẻ ăn hết bề ngang */
+@media (max-width: 760px) {
+  .frame-preview { width: auto; grid-template-columns: 1fr; }
+  .preview-img img { max-width: min(260px, 60vw); }
+  .preview-actions { padding-top: 14px; }
+}
+
+/* ---------- Điện thoại: bảng thành thẻ ---------- */
+
+@media (max-width: 620px) {
+  .staff { padding: 14px; gap: 14px; }
+
+  .fresh { flex-direction: column; align-items: stretch; gap: 14px; text-align: center; }
+  .fresh .code { font-size: 46px; }
+
+  table, thead, tbody, tr, th, td { display: block; }
+  thead { display: none; }
+
+  tbody tr {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--r-sm);
+    padding: 11px 13px;
+    margin-bottom: 10px;
+  }
+
+  tbody td {
+    border: 0;
+    padding: 3px 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  tbody td::before {
+    content: attr(data-label);
+    color: var(--text-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+
+  tbody td.right { justify-content: flex-end; padding-top: 8px; }
+  tbody td.right::before { content: ''; }
+  tbody td.mono { font-size: 21px; }
+
+  /* Bố cục thẻ: thời gian về một dòng cho gọn */
+  .when { flex-direction: row; gap: 7px; align-items: baseline; }
+
+  .modal-inner { padding: 17px; max-height: 92vh; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+  button.link { min-height: 40px; padding: 8px 10px; }
+  .pkg { min-height: 42px; }
+}

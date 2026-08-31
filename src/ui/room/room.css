@@ -1,0 +1,400 @@
+/* =========================================================================
+   Màn hình phòng chụp — 1900 Retrofoto
+   -------------------------------------------------------------------------
+   Nhìn từ xa 2-3 mét, chạm bằng ngón tay.
+   Tông SÁNG, tươi tắn: khách bước vào thấy vui vẻ, không u ám. Màn này luôn
+   sáng dù máy đặt chế độ tối — là lựa chọn có chủ đích, không phải thiếu sót.
+   ========================================================================= */
+
+@import '../brand.css';
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: light;
+
+  --bg: var(--paper);
+  --surface: #fff;
+  --surface-2: var(--paper-2);
+  --border: var(--line);
+  --text: var(--ink);
+  --text-2: #5c5567;
+  --text-3: var(--mute);
+  --accent: var(--magenta);
+  --accent-hover: var(--magenta-deep);
+  --accent-soft: var(--magenta-soft);
+  --on-accent: #fff;
+
+  --ok: #0d9b6c;
+  --ok-soft: #dcfbf0;
+  --warn: #b4690e;
+  --warn-soft: var(--amber-soft);
+  --cyan-soft: #e0f7fb;
+
+  --shadow-sm: 0 1px 2px rgba(26, 23, 32, .06);
+  --shadow: 0 4px 16px rgba(26, 23, 32, .09);
+  --shadow-lg: 0 12px 36px rgba(26, 23, 32, .16);
+}
+
+/*
+ * brand.css có @media dark ghi đè token, và media query THẮNG khối :root
+ * thường. Phải ghi đè lại ngay trong cùng media query, nếu không màn hình
+ * phòng sẽ nửa sáng nửa tối trên máy đặt chế độ tối.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+  color-scheme: light;
+
+  --bg: var(--paper);
+  --surface: #fff;
+  --surface-2: var(--paper-2);
+  --border: var(--line);
+  --text: var(--ink);
+  --text-2: #5c5567;
+  --text-3: var(--mute);
+  --accent: var(--magenta);
+  --accent-hover: var(--magenta-deep);
+  --accent-soft: var(--magenta-soft);
+  --on-accent: #fff;
+
+  --ok: #0d9b6c;
+  --ok-soft: #dcfbf0;
+  --warn: #b4690e;
+  --warn-soft: var(--amber-soft);
+  --cyan-soft: #e0f7fb;
+
+  --shadow-sm: 0 1px 2px rgba(26, 23, 32, .06);
+  --shadow: 0 4px 16px rgba(26, 23, 32, .09);
+  --shadow-lg: 0 12px 36px rgba(26, 23, 32, .16);
+  }
+}
+
+/*
+ * Nền sáng có hai quầng màu rất nhạt — magenta trên trái, cyan dưới phải.
+ * Gợi cảm giác đèn phòng chụp mà không làm chữ khó đọc.
+ */
+body {
+  background:
+    radial-gradient(70% 55% at 12% 0%, #ffe4ee 0%, transparent 62%),
+    radial-gradient(65% 50% at 88% 100%, #ddf6fa 0%, transparent 60%),
+    var(--paper);
+  background-attachment: fixed;
+  color: var(--text);
+  user-select: none;
+}
+
+/*
+ * Khoá đúng chiều cao màn hình, không cho cuộn. Mọi kích thước dùng clamp()
+ * theo chiều CAO (svh) để màn thấp tự thu nhỏ thay vì đẩy nội dung ra ngoài.
+ */
+.room {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2.2vh, 22px);
+  padding: clamp(14px, 2.4vh, 24px) clamp(16px, 3vw, 28px) clamp(16px, 3vh, 32px);
+  text-align: center;
+}
+
+/* Phần nội dung chính chiếm chỗ còn lại và tự căn giữa trong đó */
+.room-main {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2.2vh, 22px);
+}
+
+/* ---------- Thanh trên ---------- */
+
+/*
+ * Thanh trên nằm TRONG luồng, không position:fixed.
+ * Fixed từng làm dòng cảnh báo dưới cùng chồng lên thẻ QR trên màn thấp,
+ * vì phần nội dung căn giữa không biết thanh này chiếm chỗ.
+ */
+/*
+ * Lưới 3 cột chứ không phải space-between: logo nằm giữa cột 2 nên luôn ở
+ * CHÍNH GIỮA màn hình, không bị lệch theo độ dài của nhãn phòng bên phải.
+ * Hai cột ngoài cùng bề rộng, nên cột 2 tự cân.
+ */
+.room-top {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 0 clamp(4px, 1vw, 12px) clamp(6px, 1.4vh, 14px);
+  font-size: 15px;
+  color: var(--text-2);
+}
+
+.room-top .brand {
+  grid-column: 2;
+  font-size: clamp(21px, 3.6vh, 30px);
+}
+
+/* Con thứ hai (nhãn phòng / mã) về cột 3, sát mép phải */
+.room-top > :not(.brand) { grid-column: 3; justify-self: end; }
+
+.room-tag { font-size: clamp(13px, 1.9vh, 15px); }
+
+.code-chip {
+  font-family: var(--mono);
+  font-weight: 700;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  padding: 7px 16px;
+  border-radius: var(--r-pill);
+  letter-spacing: .18em;
+  color: var(--accent);
+}
+
+/* ---------- Nhập mã ---------- */
+
+.room h1 {
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1.05;
+}
+
+.lead {
+  margin: 0;
+  font-size: clamp(16px, 1.6vw, 21px);
+  color: var(--text-2);
+}
+
+
+.code-boxes { display: flex; gap: clamp(8px, 1.6vh, 14px); }
+
+.box {
+  width: clamp(50px, 9vh, 82px);
+  height: clamp(62px, 11vh, 102px);
+  border: 2px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: clamp(26px, 5.5vh, 46px);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .18s, background .18s, transform .18s, box-shadow .18s;
+}
+
+/* Ô đã nhập: viền accent dày + chữ accent, nền vẫn trắng để số dễ đọc */
+.box.on {
+  border-color: var(--accent);
+  background: var(--surface);
+  color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 4px var(--accent-soft), var(--shadow);
+}
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, clamp(72px, 11vh, 108px));
+  gap: clamp(7px, 1.4vh, 12px);
+}
+
+.keypad button {
+  height: clamp(52px, 8.5vh, 88px);
+  font-family: var(--mono);
+  font-size: clamp(20px, 3.4vh, 32px);
+  font-weight: 700;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background .12s, border-color .12s, transform .1s;
+}
+
+.keypad button:hover:not(:disabled) { border-color: var(--accent); }
+.keypad button:active:not(:disabled) {
+  background: var(--accent-soft);
+  transform: translateY(2px);
+}
+.keypad button:disabled { opacity: .35; }
+
+.keypad .wide {
+  grid-column: span 2;
+  font-family: var(--body);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* ---------- Đang chụp ---------- */
+
+.counter .big {
+  font-family: var(--mono);
+  font-size: clamp(56px, 15vh, 132px);
+  font-weight: 700;
+  line-height: .95;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.04em;
+}
+
+.counter .big span { font-size: .42em; color: var(--text-3); }
+
+.counter p {
+  margin: 8px 0 0;
+  font-size: clamp(15px, 1.6vw, 20px);
+  color: var(--text-2);
+}
+
+/*
+ * Ô đếm ảnh xếp như các khung trên dải phim — ô đã có ảnh sáng lên,
+ * ô trống để nét đứt.
+ */
+.thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 1.2vh, 10px);
+  justify-content: center;
+  max-width: min(760px, 92vw);
+}
+
+.slot {
+  width: clamp(38px, 6.5vh, 58px);
+  height: clamp(38px, 6.5vh, 58px);
+  border: 2px dashed var(--border);
+  border-radius: var(--r-sm);
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: clamp(13px, 2.2vh, 17px);
+  transition: all .2s;
+}
+
+/*
+ * Trên nền sáng, chỉ đổi nền nhạt là không đủ phân biệt với ô trống — phải
+ * đảo hẳn: nền accent đặc, chữ trắng. Nhìn từ xa 2-3 mét vẫn đếm được ngay.
+ */
+.slot.filled {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.actions .btn { font-size: clamp(14px, 2.2vh, 17px); padding: clamp(10px, 1.8vh, 15px) clamp(20px, 3vw, 30px); }
+
+/* ---------- Trạng thái & thông báo ---------- */
+
+.hint {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 14px;
+  max-width: 560px;
+}
+
+.status {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 560px;
+}
+
+.status.on { color: var(--ok); }
+.status.off { color: var(--warn); }
+.status .dim { color: var(--text-3); font-size: 13px; }
+
+.status code,
+.hint code,
+.notice code {
+  font-family: var(--mono);
+  background: var(--surface-2);
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.notice {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  border-radius: var(--r);
+  padding: 18px 24px;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+
+.notice b { color: var(--warn); font-size: 17px; }
+.notice .dim { color: var(--text-2); font-size: 14px; line-height: 1.55; }
+
+.error { color: var(--accent); font-size: 17px; margin: 0; }
+
+/* ---------- Xong: hai mã QR ---------- */
+
+.done h1 { font-size: clamp(26px, 5.5vh, 56px); }
+
+.qr-row {
+  display: flex;
+  gap: clamp(12px, 2.6vw, 26px);
+  flex-wrap: wrap;
+  justify-content: center;
+  min-height: 0;
+}
+
+.qr-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: clamp(12px, 2vh, 22px);
+  width: clamp(180px, 24vw, 290px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: var(--shadow);
+}
+
+/* Thẻ "ghép khung" là việc chính -> viền accent, có quầng sáng nhẹ */
+.qr-card.primary {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft), var(--shadow-lg);
+}
+
+.qr-card img {
+  width: 100%;
+  border-radius: var(--r-sm);
+  background: #fff;
+  border: 1px solid var(--border);
+  padding: 8px;
+  display: block;
+}
+
+.qr-card h2 { margin: clamp(7px, 1.4vh, 14px) 0 2px; font-size: clamp(17px, 2.6vh, 22px); }
+.qr-card p { margin: 0; color: var(--text-2); font-size: 14px; }
+
+.warn {
+  flex: 0 0 auto;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  padding: clamp(9px, 1.6vh, 14px) clamp(14px, 2vw, 24px);
+  border-radius: var(--r);
+  font-size: clamp(13px, 2vh, 16px);
+  max-width: min(640px, 92vw);
+  margin: 0;
+}

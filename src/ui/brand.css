@@ -1,0 +1,288 @@
+/* =========================================================================
+   1900 RETROFOTO — hệ thiết kế dùng chung
+   -------------------------------------------------------------------------
+   Bảng màu lấy từ ba lớp mực của phim màu: magenta, cyan, vàng.
+   Trung tính ngả tím nhẹ để hoà với accent, không dùng xám thuần.
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  /* --- Mực phim --- */
+  --magenta: #e8336e;
+  --magenta-deep: #c41f56;
+  --magenta-soft: #ffe8ef;
+  --cyan: #00a9c4;
+  --cyan-soft: #e0f7fb;
+  --amber: #f5a524;
+  --amber-soft: #fff4e0;
+
+  /* --- Trung tính ngả tím --- */
+  --ink: #1a1720;
+  --ink-2: #262130;
+  --ink-3: #352e42;
+  --paper: #fdfbf7;
+  --paper-2: #f6f2ec;
+  --line: #e6e0e8;
+  --mute: #8a8394;
+
+  /* --- Vai trò (giao diện sáng) --- */
+  --bg: var(--paper);
+  --surface: #fff;
+  --surface-2: var(--paper-2);
+  --border: var(--line);
+  --text: var(--ink);
+  --text-2: #5c5567;
+  --text-3: var(--mute);
+  --accent: var(--magenta);
+  --accent-hover: var(--magenta-deep);
+  --accent-soft: var(--magenta-soft);
+  --on-accent: #fff;
+
+  --ok: #0d9b6c;
+  --ok-soft: #dcfbf0;
+  --warn: #b4690e;
+  --warn-soft: var(--amber-soft);
+  /* Hành động không hoàn tác được — xoá khung, huỷ phiên */
+  --danger: #d92d20;
+
+  /* --- Hình khối --- */
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+  --tap: 44px;
+
+  --shadow-sm: 0 1px 2px rgba(26, 23, 32, .06);
+  --shadow: 0 4px 16px rgba(26, 23, 32, .09);
+  --shadow-lg: 0 12px 36px rgba(26, 23, 32, .16);
+
+  /* --- Chữ --- */
+  --display: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, sans-serif;
+  --body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+
+  color-scheme: light;
+}
+
+/*
+ * Giao diện tối. Chỉ định nghĩa lại TOKEN, không style component ở đây —
+ * component luôn đọc qua token nên tự đúng ở cả hai chế độ.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: var(--ink);
+    --surface: var(--ink-2);
+    --surface-2: var(--ink-3);
+    --border: #3a3345;
+    --text: #f4f1f7;
+    --text-2: #bdb6c7;
+    --text-3: var(--mute);
+    --accent: #ff5c8a;
+    --accent-hover: #ff7ba1;
+    --accent-soft: #3a1c2a;
+    --on-accent: #1a1720;
+    --ok: #35d6a0;
+    --ok-soft: #10352a;
+    --warn: #f5b445;
+    --warn-soft: #3a2d13;
+    --danger: #ff6b5e;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow: 0 4px 16px rgba(0, 0, 0, .45);
+    --shadow-lg: 0 12px 36px rgba(0, 0, 0, .55);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: var(--ink);
+  --surface: var(--ink-2);
+  --surface-2: var(--ink-3);
+  --border: #3a3345;
+  --text: #f4f1f7;
+  --text-2: #bdb6c7;
+  --text-3: var(--mute);
+  --accent: #ff5c8a;
+  --accent-hover: #ff7ba1;
+  --accent-soft: #3a1c2a;
+  --on-accent: #1a1720;
+  --ok: #35d6a0;
+  --ok-soft: #10352a;
+  --warn: #f5b445;
+  --warn-soft: #3a2d13;
+  --danger: #ff6b5e;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow: 0 4px 16px rgba(0, 0, 0, .45);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+
+/* ---------- Nền tảng ---------- */
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+/* Bàn phím phải thấy rõ mình đang ở đâu */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ---------- Thương hiệu ---------- */
+
+/*
+ * Logo chữ. "1900" đặt bằng font mono để nhìn như số seri trên vỏ phim,
+ * "RETROFOTO" giãn chữ như dập nổi trên hộp máy ảnh cũ.
+ */
+.brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .5em;
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.brand .n {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .02em;
+}
+
+.brand .w {
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  font-size: .78em;
+  color: var(--text);
+}
+
+/*
+ * Dải răng cưa của phim 35mm. Dùng làm đường phân cách — gợi đúng chủ đề
+ * mà không cần hình ảnh nào.
+ */
+.perf {
+  height: 12px;
+  background-image: radial-gradient(
+    circle at 6px 50%, var(--border) 0 2.5px, transparent 2.6px
+  );
+  background-size: 14px 12px;
+  background-repeat: repeat-x;
+}
+
+/* ---------- Thành phần dùng chung ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--tap);
+  padding: 11px 22px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .12s, background .15s, border-color .15s;
+}
+
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .42; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btn-ghost {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+.btn-quiet {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 10px 12px;
+  min-height: var(--tap);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.btn-quiet:hover:not(:disabled) { background: var(--accent-soft); }
+
+.chip {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+.chip:hover:not(:disabled):not(.on) { border-color: var(--accent); }
+
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.chip:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Nhãn nhỏ in hoa — giãn chữ cho ra chất nhãn hộp phim */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--text-3);
+}
+
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }

@@ -1,0 +1,35 @@
+# Phụ thuộc và bản build
+node_modules
+dist
+dist-ssr
+
+# Log
+logs
+*.log
+npm-debug.log*
+
+# --- KHÔNG BAO GIỜ commit ---
+# Mật khẩu nhân viên, đường dẫn ổ đĩa của máy chủ
+.env.local
+*.local
+
+# Ảnh khách và database — dữ liệu thật, có thông tin cá nhân
+photobook-data/
+*.db
+*.db-journal
+
+# Cấu hình trỏ vào máy thật + chứa mật khẩu — dùng bản .example
+agent/config.json
+start-server.cmd
+
+# Ảnh chụp màn hình lúc kiểm thử
+scratch/
+
+# Trình soạn thảo / hệ điều hành
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+*.suo
+*.sw?

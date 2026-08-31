@@ -1,0 +1,47 @@
+{
+  "name": "photobook",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning server/index.ts",
+    "agent": "node --experimental-strip-types --disable-warning=ExperimentalWarning agent/watcher.ts",
+    "server": "npm run build && npm start",
+    "test": "vitest run",
+    "verify": "node scripts/verify-export.mjs && node scripts/verify-remote-photos.mjs && npm run verify:api && npm run verify:flow && npm run verify:agent && npm run verify:intake && npm run verify:rooms && npm run verify:cache && npm run verify:frames && npm run verify:noscroll",
+    "verify:export": "node scripts/verify-export.mjs",
+    "verify:photos": "node scripts/verify-remote-photos.mjs",
+    "verify:api": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-api.mjs",
+    "verify:flow": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-flow.mjs",
+    "verify:agent": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-agent.mjs",
+    "frames:placeholder": "node scripts/gen-placeholder-frames.mjs",
+    "screenshot:flow": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/screenshot-flow.mjs",
+    "verify:intake": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-intake.mjs",
+    "verify:rooms": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-rooms.mjs",
+    "verify:cache": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-cache.mjs",
+    "verify:frames": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-frames.mjs",
+    "verify:noscroll": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify-noscroll.mjs"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sharp": "^0.35.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "playwright": "^1.62.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  }
+}

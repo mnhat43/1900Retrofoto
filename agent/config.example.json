@@ -1,0 +1,21 @@
+{
+  "_readme": [
+    "Chép file này thành agent/config.json rồi sửa đường dẫn cho đúng máy bạn.",
+    "Mỗi phòng trỏ tới đúng thư mục mà phần mềm Canon đang lưu ảnh.",
+    "Agent CHỈ ĐỌC, không di chuyển hay xoá gì trong thư mục của bạn.",
+    "Đường dẫn Windows nhớ dùng hai dấu gạch chéo ngược: D:\\\\Anh\\\\Phong1"
+  ],
+
+  "server": "http://127.0.0.1:8090",
+
+  "rooms": {
+    "1": "D:\\Anh\\Phong1",
+    "2": "D:\\Anh\\Phong2",
+    "3": "D:\\Anh\\Phong3"
+  },
+
+  "_optional": "Hai mục dưới không bắt buộc, bỏ đi cũng được",
+
+  "sendExisting": false,
+  "watchSubfolders": true
+}
