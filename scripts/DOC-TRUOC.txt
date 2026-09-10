@@ -11,15 +11,17 @@ BUOC 1: Chuot phai vao file  CAI-DAT.bat
 BUOC 2: Dien 4 o hien ra:
 
         - Mat khau nhan vien: tu dat, tu 4 ky tu
-        - Thu muc luu anh:    de nguyen D:\photobooth
-                              (hoac doi sang o con trong)
-        - Thu muc may anh:    de nguyen D:\Anh
+        - Thu muc luu anh:    doi sang o con nhieu
+                              cho trong, vd E:\photobooth
+        - Thu muc may anh:    doi giong o tren, vd E:\Anh
         - Cong:               de nguyen 8090
 
 BUOC 3: Bam nut "Cai dat"
 
         Xong. Server chay luon, va tu chay
         moi lan bat may.
+
+        CHUP MAN HINH bang dia chi hien ra.
 
 
 ========================================
@@ -70,3 +72,11 @@ Cong bi chiem
    -> Chay lai CAI-DAT.bat, doi Cong thanh 8095.
 
 Chi tiet hon: mo file HUONG-DAN.md
+
+
+========================================
+  BAN MOI
+========================================
+
+Tai o:
+https://github.com/mnhat43/1900Retrofoto/releases

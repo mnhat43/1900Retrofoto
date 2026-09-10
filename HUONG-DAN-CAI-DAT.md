@@ -14,7 +14,7 @@ Làm đúng thứ tự, khoảng **20 phút** là xong.
 | Thứ | Ghi chú |
 |---|---|
 | 1 máy tính Windows | Đặt ở quầy. Máy này gọi là **máy chủ**, phải bật cả ngày |
-| Thư mục cài đặt | Người đưa phần mềm cho bạn sẽ gửi, tên `1900Retrofoto` |
+| Kết nối internet | Chỉ cần lúc tải phần mềm. Cài xong thì không cần nữa |
 | WiFi của quán | Máy chủ, máy trong phòng chụp, điện thoại khách phải **cùng WiFi** |
 
 ### Kiểm tra ổ đĩa còn trống
@@ -29,21 +29,36 @@ Làm đúng thứ tự, khoảng **20 phút** là xong.
 > thay vì để mặc định `D:\photobooth`.
 
 **Không cần cài Node.js hay bất cứ phần mềm nào khác.** Mọi thứ đã nằm sẵn
-trong thư mục cài đặt.
+trong file tải về.
 
 ---
 
-## Phần B — Cài đặt
+## Phần B — Tải phần mềm
 
-### Bước 1: Chép thư mục vào máy
+1. Mở trình duyệt, vào địa chỉ:
 
-Chép thư mục `1900Retrofoto` vào ổ đĩa, ví dụ thành `C:\1900Retrofoto`.
+   **https://github.com/mnhat43/1900Retrofoto/releases**
+
+2. Tìm mục **Assets** ở phần dưới cùng của bản mới nhất
+3. Bấm vào file **`1900Retrofoto.zip`** (khoảng 44 MB) để tải về
+
+> Trình duyệt có thể cảnh báo *"…is not commonly downloaded"* → bấm mũi tên
+> nhỏ bên cạnh → chọn **Keep**. File này an toàn, chỉ là Windows chưa quen.
+
+4. Vào thư mục **Downloads**, **chuột phải** vào file vừa tải →
+   **Extract All…** → bấm **Extract**
+5. Chép thư mục `1900Retrofoto` vừa giải nén vào ổ đĩa, ví dụ thành
+   `C:\1900Retrofoto`
 
 > Đừng để trong Downloads hay Desktop — dễ bị xoá nhầm.
 
-### Bước 2: Chạy trình cài đặt
+---
 
-Mở thư mục vừa chép, tìm file **`CAI-DAT.bat`**.
+## Phần C — Cài đặt
+
+### Bước 1: Chạy trình cài đặt
+
+Mở thư mục `C:\1900Retrofoto`, tìm file **`CAI-DAT.bat`**.
 
 > ⚠️ **Chuột phải** vào file đó → chọn **"Run as administrator"**
 >
@@ -51,7 +66,7 @@ Mở thư mục vừa chép, tìm file **`CAI-DAT.bat`**.
 
 Windows có thể hỏi *"Do you want to allow this app to make changes?"* → bấm **Yes**.
 
-### Bước 3: Điền thông tin
+### Bước 2: Điền thông tin
 
 Một cửa sổ hồng hiện ra với 4 ô:
 
@@ -78,7 +93,7 @@ Một cửa sổ hồng hiện ra với 4 ô:
 | **Thư mục máy ảnh** | Sửa giống ổ trên. Ví dụ `E:\Anh` |
 | **Cổng** | Để nguyên `8090` |
 
-### Bước 4: Bấm "Cai dat"
+### Bước 3: Bấm "Cai dat"
 
 Chờ vài giây. Xong sẽ hiện bảng thông báo có **4 địa chỉ**:
 
@@ -97,7 +112,7 @@ Sau khi bấm OK, phần mềm **chạy luôn** và tự chạy mỗi lần bậ
 
 ---
 
-## Phần C — Hai việc bắt buộc
+## Phần D — Hai việc bắt buộc
 
 Chưa làm hai việc này thì hệ thống sẽ hỏng lúc đang bán hàng.
 
@@ -118,7 +133,7 @@ Chưa làm hai việc này thì hệ thống sẽ hỏng lúc đang bán hàng.
 
 | Ô | Điền gì |
 |---|---|
-| IP address | Chính là số bạn đã chụp ở Bước 4, ví dụ `192.168.1.50` |
+| IP address | Chính là số bạn đã chụp ở Bước 3, ví dụ `192.168.1.50` |
 | Subnet mask | `255.255.255.0` |
 | Gateway | Giống IP nhưng số cuối là `1`. Ví dụ `192.168.1.1` |
 | Preferred DNS | `8.8.8.8` |
@@ -128,8 +143,8 @@ Chưa làm hai việc này thì hệ thống sẽ hỏng lúc đang bán hàng.
 > **Cách nhớ đơn giản:** ba nhóm số đầu giữ nguyên như trong ảnh bạn chụp,
 > chỉ đổi số cuối. Gateway thì số cuối là `1`.
 
-**Kiểm tra lại:** mở lại phần mềm bằng lối tắt ngoài màn hình. Nếu trang quản lý
-vẫn mở được là đúng.
+**Kiểm tra lại:** mở lối tắt **1900 Retrofoto** ngoài màn hình. Nếu trang
+quản lý vẫn mở được là đúng.
 
 ### 2. Tắt chế độ ngủ
 
@@ -142,7 +157,7 @@ vẫn mở được là đúng.
 
 ---
 
-## Phần D — Cài máy trong phòng chụp
+## Phần E — Cài máy trong phòng chụp
 
 Làm cho **từng phòng**. Ví dụ dưới đây là phòng 1.
 
@@ -167,7 +182,7 @@ Làm cho **từng phòng**. Ví dụ dưới đây là phòng 1.
 
 ---
 
-## Phần E — Nối phần mềm máy ảnh
+## Phần F — Nối phần mềm máy ảnh
 
 Hệ thống lấy ảnh bằng cách **đọc thư mục**, không cần cắm dây gì thêm.
 
@@ -182,7 +197,7 @@ Hệ thống lấy ảnh bằng cách **đọc thư mục**, không cần cắm 
 
 ---
 
-## Phần F — Chạy thử trước khi mở cửa
+## Phần G — Chạy thử trước khi mở cửa
 
 Tự đóng vai khách một lần cho chắc:
 
@@ -235,11 +250,25 @@ Màn hình đã có dòng nhắc sẵn, nhưng nhân viên nên nói thêm một
 
 ---
 
+## Cập nhật bản mới
+
+Khi có bản mới:
+
+1. Vào lại **https://github.com/mnhat43/1900Retrofoto/releases**
+2. Tải file `1900Retrofoto.zip` mới nhất
+3. Giải nén, chép đè lên thư mục `C:\1900Retrofoto` cũ
+4. Chạy lại `CAI-DAT.bat` (chuột phải → Run as administrator)
+
+> **Ảnh khách an toàn.** Ảnh nằm ở thư mục riêng (`E:\photobooth`),
+> không nằm chung với phần mềm.
+
+---
+
 ## Gặp trục trặc
 
 ### "Can chay bang quyen Administrator"
 
-Bạn đã nhấp đúp thay vì chuột phải. Quay lại **Bước 2**, chuột phải vào
+Bạn đã nhấp đúp thay vì chuột phải. Quay lại Phần C Bước 1, chuột phải vào
 `CAI-DAT.bat` → **Run as administrator**.
 
 ### Điện thoại khách không quét được QR
@@ -248,7 +277,7 @@ Kiểm tra theo thứ tự:
 
 1. **Điện thoại có nối WiFi quán không?** Dùng 4G là chắc chắn không vào được
 2. **Máy chủ có bật không?** Mở lối tắt trên máy chủ xem còn chạy không
-3. **Địa chỉ có đổi không?** Nếu đổi thì Phần C mục 1 chưa làm đúng
+3. **Địa chỉ có đổi không?** Nếu đổi thì Phần D mục 1 chưa làm đúng
 
 ### Trang trắng, không hiện gì
 
@@ -257,7 +286,7 @@ Nhấn `Ctrl + Shift + R` trong trình duyệt. Vẫn trắng thì mở tab ẩn
 
 ### Máy chủ tắt, muốn bật lại
 
-Mở thư mục `1900Retrofoto` → nhấp đúp **`Chay-server.cmd`**.
+Mở thư mục `C:\1900Retrofoto` → nhấp đúp **`Chay-server.cmd`**.
 
 Cửa sổ đen hiện ra thì **để nguyên đó**, tắt là phần mềm dừng.
 
@@ -268,7 +297,7 @@ tên **đúng bằng 4 số** của mã, và ảnh nằm ngay trong đó.
 
 ### Quên mật khẩu nhân viên
 
-Mở thư mục `1900Retrofoto`, tìm file `.env.local`, mở bằng **Notepad**.
+Mở thư mục `C:\1900Retrofoto`, tìm file `.env.local`, mở bằng **Notepad**.
 Dòng `PHOTOBOOTH_PASSWORD=` chính là mật khẩu. Sửa được luôn — sửa xong
 khởi động lại máy.
 
@@ -298,3 +327,22 @@ mỗi tuần một lần.
 4. Đặt IP tĩnh **trùng với máy cũ** — như vậy QR đã đưa khách vẫn dùng được
 
 Thư mục đó chứa toàn bộ ảnh khách, khung ảnh, và bộ chỉnh màu đã lưu.
+
+---
+
+## Dành cho người biết lập trình
+
+Muốn sửa code hoặc tự đóng gói:
+
+```bash
+git clone https://github.com/mnhat43/1900Retrofoto.git
+cd 1900Retrofoto
+npm install
+npm run build
+
+# Đóng gói thành thư mục cài đặt sẵn
+powershell -ExecutionPolicy Bypass -File scripts\package-app.ps1
+```
+
+Chi tiết ở [README.md](README.md) và
+[scripts/dong-goi.md](scripts/dong-goi.md).
