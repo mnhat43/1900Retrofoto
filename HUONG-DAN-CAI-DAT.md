@@ -110,50 +110,50 @@ Số `192.168.1.50` là địa chỉ máy chủ của bạn, mỗi máy một kh
 
 Sau khi bấm OK, phần mềm **chạy luôn** và tự chạy mỗi lần bật máy.
 
+Trình cài đặt cũng đã **tự làm giùm** những việc sau, bạn không phải mở
+Windows Settings lần nào:
+
+| Việc | Vì sao cần |
+|---|---|
+| Tắt chế độ ngủ | Máy ngủ là khách không quét được QR. Điện thoại khách **không đánh thức máy được** |
+| Tắt ngủ cả khi chạy pin | Laptop mất điện thì chuyển sang pin và tự ngủ; điện có lại máy **vẫn đang ngủ** |
+| Tắt "đóng nắp là ngủ" | Chỉ áp dụng nếu máy chủ là laptop |
+| Mở firewall cho cả 2 loại mạng | Windows hay xếp WiFi quán là *Public*; chỉ mở *Private* là điện thoại khách bị chặn sạch |
+| Đăng ký tự chạy khi bật máy | Mất điện, bật lại là server tự lên, không cần ai đăng nhập |
+| Đăng ký tự cứu khi server chết | Cứ 5 phút kiểm tra một lần, chết thì tự bật lại |
+| Tạo 5 lối tắt ngoài màn hình | `1900 Retrofoto`, `KIEM-TRA`, `KHOI-DONG-LAI`, `SUA-IP`, `DAT-IP-TINH` |
+
 ---
 
-## Phần D — Hai việc bắt buộc
+## Phần D — Một việc nên làm
 
-Chưa làm hai việc này thì hệ thống sẽ hỏng lúc đang bán hàng.
+### Ghim địa chỉ cố định
 
-### 1. Đặt IP tĩnh ⚠️ Quan trọng nhất
+**Vì sao:** Mã QR đưa cho khách có chứa địa chỉ máy chủ. Mặc định cục WiFi
+*cho thuê* địa chỉ này theo kiểu tạm thời — mất điện hoặc khởi động lại cục
+WiFi là máy có thể được cấp số khác, và **tất cả QR đã đưa khách sẽ hỏng
+hết**.
 
-**Vì sao:** Mã QR đưa cho khách có chứa địa chỉ máy chủ. Nếu địa chỉ đổi
-(mất điện, khởi động lại cục WiFi), **tất cả QR đã đưa khách sẽ hỏng hết**.
+**Cách làm — một nút:**
 
-**Cách làm:**
+**Nhấp đúp** lối tắt **`DAT-IP-TINH`** ngoài màn hình.
 
-1. Bấm **Start** → gõ `Settings` → Enter
-2. Vào **Network & Internet**
-3. Bấm vào mạng đang dùng (**WiFi** hoặc **Ethernet**)
-4. Kéo xuống mục **IP assignment** → bấm **Edit**
-5. Đổi từ **Automatic (DHCP)** sang **Manual**
-6. Bật nút **IPv4** lên
-7. Điền 4 ô:
+Windows hỏi *"Do you want to allow…"* → bấm **Yes**. Rồi gõ chữ `g` → Enter.
 
-| Ô | Điền gì |
-|---|---|
-| IP address | Chính là số bạn đã chụp ở Bước 3, ví dụ `192.168.1.50` |
-| Subnet mask | `255.255.255.0` |
-| Gateway | Giống IP nhưng số cuối là `1`. Ví dụ `192.168.1.1` |
-| Preferred DNS | `8.8.8.8` |
+Xong. Không phải điền số nào cả.
 
-8. Bấm **Save**
+> **Vì sao không bắt bạn tự điền trong Settings:** bảng 4 ô trong Windows rất
+> dễ điền sai. Gateway thường là `.1` nhưng **không phải luôn luôn** — có
+> router dùng `.254`, có mạng là `10.x`. Điền sai gateway là máy mất mạng
+> hoàn toàn.
+>
+> File này **đọc lại đúng bộ số máy đang chạy tốt** rồi ghim y nguyên bộ số
+> đó. Không đoán, không gõ tay, nên không sai. Và nếu ghim xong mà mất mạng,
+> nó **tự trả lại như cũ** ngay lập tức.
 
-> **Cách nhớ đơn giản:** ba nhóm số đầu giữ nguyên như trong ảnh bạn chụp,
-> chỉ đổi số cuối. Gateway thì số cuối là `1`.
-
-**Kiểm tra lại:** mở lối tắt **1900 Retrofoto** ngoài màn hình. Nếu trang
-quản lý vẫn mở được là đúng.
-
-### 2. Tắt chế độ ngủ
-
-**Vì sao:** Máy chủ ngủ là cả hệ thống ngừng chạy. Khách không quét được QR.
-
-1. **Start** → gõ `Settings` → Enter
-2. **System** → **Power & battery**
-3. Mở mục **Screen and sleep**
-4. Đổi **tất cả** các dòng thành **Never**
+**Nên làm thêm (nhờ kỹ thuật hoặc chủ quán):** vào trang quản lý cục WiFi,
+đặt *DHCP reservation* cho địa chỉ đó. Như vậy cục WiFi không bao giờ cấp số
+đó cho máy khác.
 
 ---
 
@@ -238,6 +238,84 @@ Sau khi khách đã tải ảnh về, bấm **Đóng** ở dòng *"đang ghép �
 Khách quên tải thì trong 7 ngày vẫn lấy hộ được: trang quản lý → tìm phiên
 → **Xem ảnh** → tải về.
 
+### Theo dõi ổ đĩa
+
+Trên thanh tiêu đề trang quản lý, góc phải, luôn có một **đèn báo dung
+lượng** — ví dụ `130 GB trống`.
+
+| Màu đèn | Nghĩa là | Phải làm gì |
+|---|---|---|
+| Xám | Còn thoải mái | Không cần làm gì |
+| Vàng | Còn dưới 20 GB | Dọn ảnh cũ trong tuần này |
+| Đỏ | Còn dưới 5 GB | **Dọn ngay**, không thì ảnh khách không lưu được |
+
+**Cách dọn:** bấm vào đèn đó (hoặc tab **Ổ đĩa**) → hiện các mốc:
+
+```
+Cũ hơn 30 ngày     12 phiên · 8.4 GB
+Cũ hơn 14 ngày     34 phiên · 22.1 GB
+Cũ hơn 7 ngày      51 phiên · 35.8 GB
+Cũ hơn 3 ngày      68 phiên · 47.2 GB
+```
+
+Bấm mốc **từ trên xuống**, dừng lại khi đã đủ chỗ. Mỗi nút ghi rõ sẽ xoá bao
+nhiêu phiên và được thêm bao nhiêu GB **trước khi** bạn bấm.
+
+> **An toàn:** phiên đang có khách trong phòng **không bao giờ** bị xoá, kể cả
+> khi đã quá mốc. Danh sách phiên vẫn giữ lại để tra cứu, chỉ ảnh bị xoá.
+
+---
+
+## ⚙️ Khi có sự cố — chỉ cần 3 nút
+
+Ba lối tắt này nằm ngoài màn hình máy chủ. Nhân viên **không cần biết gì
+thêm** ngoài ba dòng dưới đây.
+
+### 1. Trang không lên, hoặc khách không quét được QR
+
+**Nhấp đúp `KIEM-TRA`** (ngoài màn hình).
+
+Nó tự kiểm tra hết mọi thứ rồi in ra **đúng việc cần làm**, ví dụ:
+
+```
+  KET QUA
+  -----------------------------------------------
+  [OK      ] Server dang chay (da chay 6 gio 12 phut)
+  [LOI     ] MA QR TRO SAI DIA CHI: QR ghi 192.168.1.77
+             nhung may dang la 192.168.1.50
+  [OK      ] O dia con 130 GB trong
+
+  VIEC CAN LAM (lam theo thu tu tu tren xuong):
+  -----------------------------------------------
+  1. Nhap dup SUA-IP.bat - no tu sua lai het, mat 10 giay
+```
+
+Làm theo danh sách đó là xong. Không phải đoán, không phải đọc log.
+
+### 2. Server chết hoặc treo
+
+**Nhấp đúp `KHOI-DONG-LAI`**, chờ khoảng 20 giây.
+
+Xong sẽ hiện `XONG. Server dang chay.` kèm 4 địa chỉ.
+
+> Thường thì **không cần làm gì cả** — hệ thống tự kiểm tra 5 phút một lần và
+> tự bật lại. Nút này để không phải chờ 5 phút đó.
+
+### 3. Địa chỉ bị đổi (sau mất điện, đổi cục WiFi)
+
+**Nhấp đúp `SUA-IP`** ngoài màn hình.
+
+Nó tự tìm địa chỉ mới, ghi lại vào cấu hình, tạo lại lối tắt, khởi động lại
+server, và ghi danh sách địa chỉ mới ra file `DIA-CHI-1900RETROFOTO.txt`
+ngoài màn hình.
+
+> ⚠️ **Còn một việc phải làm bằng tay:** lối tắt trên **từng máy trong phòng
+> chụp** vẫn ghi địa chỉ cũ. Ra từng phòng, chuột phải vào lối tắt →
+> **Properties** → sửa địa chỉ theo file `DIA-CHI-1900RETROFOTO.txt`.
+>
+> Làm `DAT-IP-TINH.bat` (Phần D) một lần là gần như không bao giờ phải làm
+> lại việc này.
+
 ---
 
 ## ⚠️ Điều khách cần biết
@@ -273,11 +351,14 @@ Bạn đã nhấp đúp thay vì chuột phải. Quay lại Phần C Bước 1, 
 
 ### Điện thoại khách không quét được QR
 
-Kiểm tra theo thứ tự:
+**Việc đầu tiên: nhấp đúp `KIEM-TRA` ngoài màn hình.** Nó tự tìm ra nguyên
+nhân trong ba nguyên nhân dưới đây và chỉ đúng việc cần làm.
+
+Nếu muốn tự kiểm tra bằng tay:
 
 1. **Điện thoại có nối WiFi quán không?** Dùng 4G là chắc chắn không vào được
-2. **Máy chủ có bật không?** Mở lối tắt trên máy chủ xem còn chạy không
-3. **Địa chỉ có đổi không?** Nếu đổi thì Phần D mục 1 chưa làm đúng
+2. **Máy chủ có bật không?** Nhấp đúp `KHOI-DONG-LAI` cho chắc
+3. **Địa chỉ có đổi không?** Nhấp đúp `SUA-IP.bat` — xem mục *Khi có sự cố*
 
 ### Trang trắng, không hiện gì
 
@@ -286,9 +367,12 @@ Nhấn `Ctrl + Shift + R` trong trình duyệt. Vẫn trắng thì mở tab ẩn
 
 ### Máy chủ tắt, muốn bật lại
 
-Mở thư mục `C:\1900Retrofoto` → nhấp đúp **`Chay-server.cmd`**.
+Nhấp đúp lối tắt **`KHOI-DONG-LAI`** ngoài màn hình. Chờ khoảng 20 giây.
 
-Cửa sổ đen hiện ra thì **để nguyên đó**, tắt là phần mềm dừng.
+> Bình thường **không cần làm gì** — hệ thống tự bật lại trong vòng 5 phút.
+
+Muốn xem cửa sổ chạy để đọc lỗi thì nhấp đúp `Chay-server.cmd` trong thư mục
+`C:\1900Retrofoto`. Cửa sổ đen hiện ra thì **để nguyên đó**, tắt là dừng.
 
 ### Bấm "Đã chụp xong" mà không thấy ảnh
 
@@ -308,23 +392,37 @@ Máy đã có phần mềm khác chiếm cổng đó. Chạy lại `CAI-DAT.bat`
 
 > Nhớ **tạo lại lối tắt** ở các máy phòng với số cổng mới.
 
+### Đèn ổ đĩa màu đỏ
+
+Ổ gần hết chỗ. Bấm vào đèn đó → tab **Ổ đĩa** → bấm mốc dọn dẹp từ trên
+xuống. Xem mục *Theo dõi ổ đĩa* ở trên.
+
+### Không biết đang bị gì
+
+Nhấp đúp **`KIEM-TRA`** ngoài màn hình. Nó chỉ ra đúng việc cần làm.
+
 ---
 
 ## Việc nên làm hằng tuần
 
-**Sao lưu ảnh.** Ổ cứng hỏng là mất sạch, không có bản dự phòng nào khác.
+**1. Sao lưu ảnh.** Ổ cứng hỏng là mất sạch, không có bản dự phòng nào khác.
 
 Cách đơn giản nhất: cắm ổ cứng ngoài, chép thư mục `E:\photobooth` sang đó
 mỗi tuần một lần.
+
+**2. Nhấp đúp `KIEM-TRA` một lần.** Mất 15 giây, và nó phát hiện được những
+thứ đang âm thầm sai mà chưa ai thấy — ví dụ địa chỉ đã đổi nhưng chưa ai
+quét QR để phát hiện, hoặc ổ đĩa sắp hết chỗ.
 
 ---
 
 ## Chuyển sang máy chủ khác
 
-1. Trên máy cũ: nhấp đúp `Chay-server.cmd` rồi **đóng cửa sổ đen** để dừng
+1. Trên máy cũ: mở Task Manager → tắt hết tiến trình `node.exe` để dừng server
 2. Chép **cả thư mục** `E:\photobooth` sang máy mới
 3. Cài đặt trên máy mới theo hướng dẫn này, điền **đúng đường dẫn cũ**
-4. Đặt IP tĩnh **trùng với máy cũ** — như vậy QR đã đưa khách vẫn dùng được
+4. Chạy `SUA-IP.bat` rồi `DAT-IP-TINH.bat` trên máy mới
+5. Sửa lối tắt ở các máy trong phòng chụp theo địa chỉ mới
 
 Thư mục đó chứa toàn bộ ảnh khách, khung ảnh, và bộ chỉnh màu đã lưu.
 

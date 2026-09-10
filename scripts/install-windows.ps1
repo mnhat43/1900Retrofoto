@@ -4,9 +4,13 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
 #
 # Script lam 3 viec:
-#   1. Mo firewall cho cong 8080 (chi mang Private)
+#   1. Mo firewall cho cong 8080 (ca mang Private va Public)
 #   2. Tao Scheduled Task de server tu chay khi khoi dong may
 #   3. In ra dia chi de cau hinh PC cac phong
+#
+# Duong cai NAY danh cho nguoi co ma nguon. Nguoi khong biet code thi dung
+# goi dong san (xem scripts\dong-goi.md) - goi do co CAI-DAT.bat lam nhieu
+# viec hon: tat che do ngu, dat IP tinh, tu cuu khi server treo.
 #
 # LUU Y: file nay chi dung ky tu ASCII. Windows PowerShell 5.1 doc file
 # UTF-8 khong BOM theo bang ma ANSI, lam vo chuoi co dau tieng Viet.
@@ -23,6 +27,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $AppDir = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "lib-net.ps1")
 
 Write-Host ""
 Write-Host "  Cai dat Photo Booth Studio" -ForegroundColor Cyan
@@ -110,20 +115,46 @@ if (-not (Test-Path $DataDir)) {
 }
 Write-Host "  [ok] Thu muc du lieu san sang"
 
-# --- Firewall: CHI mang Private, khong mo ra mang cong cong ---
+# --- Firewall: ca Private va Public ---
+#
+# Mo ca hai chu khong chi Private: Windows rat hay xep WiFi quan vao loai
+# Public (mac dinh khi noi mang moi, hoac khi bam "No" o cau hoi "Allow your
+# PC to be discoverable"). Khi do rule chi-Private khong ap dung, server chay
+# hoan hao ma dien thoai khach bi firewall chan sach - khong co dau hieu gi
+# de doan ra. Day van la mang LAN sau router, khong mo ra internet.
 $ruleName = "Photo Booth Studio"
 try { Remove-NetFirewallRule -DisplayName $ruleName -ErrorAction Stop } catch {}
-New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -LocalPort $Port -Protocol TCP -Action Allow -Profile Private | Out-Null
-Write-Host "  [ok] Mo firewall cong $Port (chi mang Private)"
+New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -LocalPort $Port -Protocol TCP -Action Allow -Profile Private, Public | Out-Null
+Write-Host "  [ok] Mo firewall cong $Port (mang Private va Public)"
+
+# --- Dia chi LAN ---
+#
+# Dung Get-LanAdapter (loc card ao cua WSL / Docker / VirtualBox / VPN, va
+# doi hoi card phai co default gateway) chu khong lay card IPv4 dau tien:
+# chon nham card ao thi ma QR tro vao dia chi dien thoai khach khong bao gio
+# toi duoc, ma trang quan ly tren may chu van mo binh thuong.
+$adapter = Get-LanAdapter
+$ip = Get-LanIp
+if (-not $ip) {
+  Write-Host "  [!] Khong tim duoc card mang dang dung. Noi WiFi hoac cam day mang." -ForegroundColor Red
+  exit 1
+}
+$ipInfo = @($adapter.IPv4Address | Where-Object { $_.IPAddress -eq $ip })[0]
+$isDhcp = $ipInfo.PrefixOrigin -ne 'Manual'
+Write-Host "  [ok] Dia chi LAN: $ip ($($adapter.InterfaceAlias))"
 
 # --- File cau hinh ---
 # Dau dong '"@' PHAI o cot 0, khong duoc thut le.
+#
+# PHOTOBOOTH_HOST la dia chi duoc IN VAO MA QR. Ghim thang vao day thay vi
+# de server tu doan card mang luc chay - xem ly do o phan tim dia chi tren.
 $envFile = Join-Path $AppDir ".env.local"
 $envText = @"
 PHOTOBOOTH_DATA=$DataDir
 PHOTOBOOTH_PASSWORD=$Password
 PHOTOBOOTH_PORT=$Port
 PHOTOBOOTH_CAPTURE=$CaptureDir
+PHOTOBOOTH_HOST=${ip}:${Port}
 "@
 # Ghi UTF-8 KHONG BOM. Set-Content -Encoding utf8 tren PowerShell 5.1 luon
 # them BOM, lam hong khoa dau tien khi server doc file.
@@ -161,11 +192,6 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest -User "SYSTEM" | Out-Null
 Write-Host "  [ok] Server se tu chay khi khoi dong may"
 
-# --- Dia chi LAN ---
-$ipInfo = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch 'Loopback' -and $_.IPAddress -notmatch '^169\.' } | Select-Object -First 1
-$ip = $ipInfo.IPAddress
-$isDhcp = $ipInfo.PrefixOrigin -eq 'Dhcp'
-
 Write-Host ""
 Write-Host "  Cai dat xong!" -ForegroundColor Green
 Write-Host ""
@@ -179,8 +205,9 @@ if ($isDhcp) {
   Write-Host "   1. DAT IP TINH cho may nay - QUAN TRONG NHAT" -ForegroundColor Red
   Write-Host "      May dang lay IP tu DHCP ($ip), router co the doi bat cu luc nao."
   Write-Host "      Khi IP doi, TAT CA ma QR da phat cho khach se hong."
-  Write-Host "      Cach dat: Settings > Network > Wi-Fi > Hardware properties"
-  Write-Host "                > IP assignment > Edit > Manual > IPv4 On"
+  Write-Host "      Cach nhanh nhat: chay scripts\dat-ip-tinh.ps1 - no doc lai"
+  Write-Host "      dung bo so may dang chay tot roi ghim y nguyen, va tu tra"
+  Write-Host "      lai DHCP neu mat mang. Khong phai dien so nao."
 } else {
   Write-Host "   1. IP da co dinh ($ip) - tot"
 }

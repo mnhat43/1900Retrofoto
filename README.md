@@ -66,12 +66,21 @@ npm run build
 powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
 ```
 
-Script sẽ: mở firewall (chỉ mạng Private), tạo tác vụ tự chạy khi khởi động máy,
-và in ra địa chỉ cho từng phòng.
+Script sẽ: mở firewall (cả Private và Public), ghi `PHOTOBOOTH_HOST` vào
+`.env.local`, tạo tác vụ tự chạy khi khởi động máy, và in ra địa chỉ cho
+từng phòng.
+
+> **Đây là đường cài dành cho người có mã nguồn.** Giao cho quán thì dùng gói
+> đóng sẵn (xem [scripts/dong-goi.md](scripts/dong-goi.md)) — gói đó tự tắt
+> chế độ ngủ, tự đăng ký watchdog, và có `KIEM-TRA.bat` để nhân viên tự chẩn
+> đoán.
 
 **Sau khi cài, còn 4 việc bạn phải tự làm:**
 
-1. **Đặt IP tĩnh** cho máy chủ — nếu IP đổi thì QR đã phát cho khách sẽ hỏng
+1. **Đặt IP tĩnh** cho máy chủ — nếu IP đổi thì QR đã phát cho khách sẽ hỏng.
+   Nhanh nhất: `powershell -ExecutionPolicy Bypass -File scripts\dat-ip-tinh.ps1`
+   (đọc lại đúng bộ số máy đang chạy tốt rồi ghim y nguyên, tự trả lại DHCP
+   nếu mất mạng)
 2. **Tắt chế độ ngủ**: Settings → Power → Screen and sleep → Never
 3. **Bật sao lưu** thư mục dữ liệu sang ổ ngoài — ổ cứng hỏng là mất hết ảnh,
    không có bản sao nào khác
@@ -131,6 +140,9 @@ Nếu muốn khách xem được từ nhà: thêm Cloudflare Tunnel — kiến t
 | `PHOTOBOOTH_RETENTION_DAYS` | `7` | Số ngày giữ ảnh |
 | `PHOTOBOOTH_CODE_TTL` | `120` | Mã 4 số hết hạn sau bao nhiêu phút |
 | `PHOTOBOOTH_CAPTURE` | *(trống)* | Thư mục gốc nơi máy ảnh lưu ảnh — xem mục dưới |
+| `PHOTOBOOTH_HOST` | *(tự dò)* | `ip:cổng` in vào mã QR. **Nên ghim** — xem mục dưới |
+| `PHOTOBOOTH_DISK_WARN_GB` | `20` | Còn dưới mức này thì đèn ổ đĩa vàng |
+| `PHOTOBOOTH_DISK_CRIT_GB` | `5` | Còn dưới mức này thì đèn ổ đĩa đỏ |
 
 Đặt trong file `.env.local` ở thư mục gốc (script cài đặt tự tạo).
 
@@ -150,6 +162,25 @@ D:\photobooth\
 
 Job dọn dẹp chạy mỗi 6 giờ, xoá thư mục quá hạn giữ. Bản ghi trong database
 được giữ lại (đánh dấu đã xoá) để nhân viên còn tra được lịch sử.
+
+Ngoài job tự động, trang nhân viên có tab **Ổ đĩa** hiện dung lượng còn trống
+và cho dọn theo mốc tuổi ảnh (30/14/7/3 ngày), mỗi mốc ghi rõ sẽ xoá bao nhiêu
+phiên và giải phóng bao nhiêu GB trước khi bấm. Phiên đang chiếm phòng
+(`created`/`active`/`shooting`) không bao giờ bị xoá, kể cả khi đã quá mốc.
+
+## Vì sao phải ghim `PHOTOBOOTH_HOST`
+
+Mã QR đưa cho khách được dựng từ địa chỉ LAN của máy chủ. Nếu để server tự dò,
+nó quét danh sách card mạng — và máy nào có WSL, Docker, VirtualBox hay VPN đều
+mọc thêm card ảo (`172.x`, `192.168.56.x`).
+
+Chọn nhầm card là kiểu hỏng tệ nhất của hệ thống này: server chạy hoàn hảo,
+trang quản lý mở bình thường, log không có lỗi nào — nhưng **điện thoại khách
+không bao giờ vào được**, và không có dấu hiệu gì để đoán ra.
+
+`lanAddress()` trong `server/index.ts` đã lọc card ảo theo tên và chấm điểm ưu
+tiên dải LAN, nhưng đó chỉ là phương án dự phòng. Nguồn đáng tin là
+`PHOTOBOOTH_HOST` do trình cài đặt ghi vào — và `SUA-IP.bat` ghi lại khi IP đổi.
 
 ## Bảo mật mã 4 số
 
@@ -245,7 +276,7 @@ một hàm**, chỉ khác tham số kích thước.
 ## Kiểm chứng
 
 ```bash
-npm test              # 40 unit test (toán hình học, sinh mã, chống dò, dọn dẹp)
+npm test              # 111 unit test (toán hình học, sinh mã, chống dò, dọn dẹp)
 npm run verify        # chạy tất cả kiểm chứng bên dưới
 ```
 

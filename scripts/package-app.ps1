@@ -62,11 +62,18 @@ Copy-Item $nodeExe (Join-Path $OutDir "runtime\node.exe") -Force
 Write-Host "  [ok] Da nhung Node runtime"
 
 # --- 6. Cai thu vien can khi chay ---
-# Chi cai dependencies (khong co devDependencies) de goi nho lai
-Write-Host "  Dang cai thu vien (vai phut)..."
+#
+# Dung 'npm ci' voi package-lock.json chu khong 'npm install':
+#   - Deterministic: goi dong hom nay va goi dong thang sau giong het nhau,
+#     nen loi chi xay ra tren may quan thi con tai hien lai duoc.
+#   - Nhanh hon nhieu (vai giay thay vi vai phut).
+#   - 'npm install' khong co lock tren cay da bi cat devDependencies con hay
+#     bao loi "Cannot read properties of null (reading 'edgesOut')".
+Write-Host "  Dang cai thu vien..."
+Copy-Item (Join-Path $AppDir "package-lock.json") $OutDir -Force
 Push-Location $OutDir
 & $nodeExe (Join-Path (Split-Path $nodeExe) "node_modules\npm\bin\npm-cli.js") `
-  install --omit=dev --no-audit --no-fund 2>&1 | Out-Null
+  ci --omit=dev --no-audit --no-fund 2>&1 | Out-Null
 $npmOk = $LASTEXITCODE -eq 0
 Pop-Location
 if (-not $npmOk) {
@@ -80,51 +87,132 @@ foreach ($m in @("react", "react-dom")) {
 }
 Write-Host "  [ok] Da cai thu vien"
 
-# --- 7. File khoi dong ---
-# Dung node.exe nhung san, khong phu thuoc PATH cua may dich
+<#
+  Ghi file .bat / .cmd voi kieu xuong dong CRLF.
+
+  BAT BUOC phai CRLF: cmd.exe xu ly sai nhan (:label) va cac khoi nhieu dong
+  khi file chi co LF - dung kieu loi chay duoc tren may nay ma hong tren may
+  khac. 'Set-Content' voi MOT chuoi nhieu dong ghi y nguyen chuoi do (giu LF),
+  nen phai tach thanh mang tung dong truoc: Set-Content nhan mang thi tu them
+  xuong dong cua he thong (CRLF tren Windows) sau moi phan tu.
+#>
+function Write-BatFile([string]$Path, [string]$Text) {
+  Set-Content -Path $Path -Value ($Text -split "\r?\n") -Encoding ASCII
+}
+
+# --- 7. Script PowerShell dung chung ---
+# lib-net.ps1 phai di kem: cac script khac dot-source no
+foreach ($s in @(
+    "lib-net.ps1", "setup-gui.ps1", "theo-doi.ps1",
+    "kiem-tra.ps1", "sua-ip.ps1", "dat-ip-tinh.ps1", "khoi-dong-lai.ps1"
+  )) {
+  Copy-Item (Join-Path $PSScriptRoot $s) $OutDir -Force
+}
+Write-Host "  [ok] Da chep script cai dat va sua chua"
+
+# --- 8. File khoi dong ---
+#
+# Co HAI ban, va su khac nhau la quan trong:
+#
+#   Chay-server.cmd          - nhan vien nhap dup. Co 'pause' de con doc
+#                              duoc loi truoc khi cua so dong.
+#   Chay-server-am-tham.cmd  - Task Scheduler chay. TUYET DOI KHONG co
+#                              'pause': tac vu chay quyen SYSTEM, khong co ai
+#                              bam phim, nen 'pause' se treo mai mai. Khi do
+#                              Windows van thay tac vu "dang chay" va co che
+#                              tu bat lai khong bao gio kich hoat duoc.
 @'
 @echo off
 cd /d "%~dp0"
 if not exist ".env.local" (
-  echo Chua cau hinh. Nhap dup CAI-DAT.bat truoc.
+  echo Chua cau hinh. Chuot phai vao CAI-DAT.bat, chon Run as administrator.
   pause
   exit /b 1
 )
 runtime\node.exe --experimental-strip-types --disable-warning=ExperimentalWarning server\index.ts
 pause
-'@ | Set-Content (Join-Path $OutDir "Chay-server.cmd") -Encoding ASCII
+'@ | ForEach-Object { Write-BatFile (Join-Path $OutDir "Chay-server.cmd") $_ }
 
-Write-Host "  [ok] Da tao Chay-server.cmd"
+# Ghi de log moi lan chay (khong noi them): can biet vi sao LAN CUOI khong
+# len, chu khong can lich su ca thang.
+@'
+@echo off
+cd /d "%~dp0"
+rem chcp 65001 = UTF-8, de log khong bi loi font khi server in chu co dau
+chcp 65001 >nul 2>&1
+if not exist ".env.local" exit /b 1
+if not exist "logs" mkdir "logs"
+runtime\node.exe --experimental-strip-types --disable-warning=ExperimentalWarning server\index.ts > "logs\lan-chay-cuoi.log" 2>&1
+'@ | ForEach-Object { Write-BatFile (Join-Path $OutDir "Chay-server-am-tham.cmd") $_ }
 
-# --- 8. Trinh cai dat co giao dien ---
-Copy-Item (Join-Path $PSScriptRoot "setup-gui.ps1") $OutDir -Force
+Write-Host "  [ok] Da tao file khoi dong"
+
+# --- 9. Cac file .bat cho nhan vien nhap dup ---
+#
+# Nhung viec can quyen Administrator thi TU XIN QUYEN (Start-Process -Verb
+# RunAs) thay vi bat nhan vien nho chuot phai. Nho chuot phai la viec hay bi
+# quen nhat, va khi quen thi script that bai mot cach kho hieu.
+$elevated = @'
+@echo off
+cd /d "%~dp0"
+net session >nul 2>&1
+if %errorlevel%==0 goto run
+powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+exit /b
+:run
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0__SCRIPT__"
+'@
+
+$plain = @'
+@echo off
+cd /d "%~dp0"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0__SCRIPT__"
+'@
+
+# CAI-DAT.bat khong tu xin quyen: huong dan in ra va dan tren hop giay deu
+# ghi "chuot phai -> Run as administrator", nen giu nguyen thao tac do de
+# khong lech voi giay to da phat.
 @'
 @echo off
 cd /d "%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup-gui.ps1"
-'@ | Set-Content (Join-Path $OutDir "CAI-DAT.bat") -Encoding ASCII
+'@ | ForEach-Object { Write-BatFile (Join-Path $OutDir "CAI-DAT.bat") $_ }
 
-Write-Host "  [ok] Da tao CAI-DAT.bat"
+foreach ($pair in @(
+    @("KIEM-TRA.bat", "kiem-tra.ps1", $true),
+    @("KHOI-DONG-LAI.bat", "khoi-dong-lai.ps1", $true),
+    @("SUA-IP.bat", "sua-ip.ps1", $true),
+    @("DAT-IP-TINH.bat", "dat-ip-tinh.ps1", $true)
+  )) {
+  $tpl = if ($pair[2]) { $elevated } else { $plain }
+  Write-BatFile (Join-Path $OutDir $pair[0]) $tpl.Replace('__SCRIPT__', $pair[1])
+}
+Write-Host "  [ok] Da tao KIEM-TRA / KHOI-DONG-LAI / SUA-IP / DAT-IP-TINH"
 
-# --- 9. Loi tat mo trang quan ly ---
-# Doc IP va cong tu .env.local luc chay, khong ghi cung vao file
+# --- 10. Loi tat mo trang quan ly ---
+#
+# Doc PHOTOBOOTH_HOST tu .env.local. Ban truoc doc IP bang cach loc ipconfig,
+# va cach do lay dong IPv4 dau tien - tren may co WSL / VirtualBox thi do la
+# card ao, mo ra trang trong. Cau hinh la nguon duy nhat dang tin.
+#
+# Dung goto chu khong long if trong ngoac: bien dat trong khoi ngoac khong
+# duoc cap nhat ngay (chuyen kinh dien cua file .bat).
 @'
 @echo off
 cd /d "%~dp0"
+set HOSTPORT=
+for /f "tokens=2 delims==" %%a in ('findstr /b PHOTOBOOTH_HOST .env.local') do set HOSTPORT=%%a
+if not "%HOSTPORT%"=="" goto go
+set PORT=8090
 for /f "tokens=2 delims==" %%a in ('findstr /b PHOTOBOOTH_PORT .env.local') do set PORT=%%a
-if "%PORT%"=="" set PORT=8090
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-  set IP=%%a
-  goto :found
-)
-:found
-set IP=%IP: =%
-start http://%IP%:%PORT%/staff
-'@ | Set-Content (Join-Path $OutDir "Mo-trang-quan-ly.cmd") -Encoding ASCII
+set HOSTPORT=127.0.0.1:%PORT%
+:go
+start "" http://%HOSTPORT%/staff
+'@ | ForEach-Object { Write-BatFile (Join-Path $OutDir "Mo-trang-quan-ly.cmd") $_ }
 
 Write-Host "  [ok] Da tao Mo-trang-quan-ly.cmd"
 
-# --- 10. Huong dan ngan de canh file cai ---
+# --- 11. Huong dan de canh file cai ---
 Copy-Item (Join-Path $AppDir "HUONG-DAN-CAI-DAT.md") (Join-Path $OutDir "HUONG-DAN.md") -Force
 Copy-Item (Join-Path $PSScriptRoot "DOC-TRUOC.txt") (Join-Path $OutDir "DOC-TRUOC.txt") -Force
 Write-Host "  [ok] Da chep huong dan"

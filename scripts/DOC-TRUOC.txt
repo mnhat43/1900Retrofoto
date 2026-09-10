@@ -23,22 +23,29 @@ BUOC 3: Bam nut "Cai dat"
 
         CHUP MAN HINH bang dia chi hien ra.
 
+        Trinh cai dat da TU LAM gium:
+        tat che do ngu, mo firewall, dang ky
+        tu chay lai khi server chet.
+
 
 ========================================
-  CON 2 VIEC PHAI TU LAM
+  CON 1 VIEC NEN LAM
 ========================================
 
-1. DAT IP TINH cho may nay
-   Neu khong lam, khi mat dien hoac khoi dong
-   lai router thi IP doi -> moi ma QR da phat
-   cho khach se HONG.
+GHIM DIA CHI CO DINH
 
-2. TAT CHE DO NGU
-   Settings > System > Power & battery
-   > Screen and sleep > chon Never
-   May ngu la ca he thong chet.
+   Nhap dup loi tat  DAT-IP-TINH
+   (ngoai man hinh). Bam Yes, roi go chu
+   g  va Enter.
 
-   Xem chi tiet trong file HUONG-DAN.md
+   Khong phai dien so nao ca - no doc lai
+   dung bo so may dang chay tot roi ghim lai.
+   Neu ghim xong ma mat mang, no tu tra lai
+   nhu cu ngay.
+
+   VI SAO: ma QR co chua dia chi may chu.
+   Khong ghim thi mat dien la dia chi doi,
+   va moi ma QR da phat cho khach se HONG.
 
 
 ========================================
@@ -46,15 +53,48 @@ BUOC 3: Bam nut "Cai dat"
 ========================================
 
 Mo trang quan ly:
-   Nhap dup  Mo-trang-quan-ly.cmd
-   (hoac dung loi tat ngoai man hinh)
+   Nhap dup loi tat  1900 Retrofoto
+   (ngoai man hinh)
 
-Server bi tat:
-   Nhap dup  Chay-server.cmd
+Xem con bao nhieu cho trong:
+   Goc phai tren trang quan ly co den bao
+   dung luong. Vang la nen don, do la don
+   NGAY (bam vao den -> bam moc don dep).
 
 
 ========================================
-  GAP LOI?
+  CO VAN DE? CHI CAN 3 NUT
+========================================
+
+1. KHONG BIET DANG BI GI
+   -> Nhap dup  KIEM-TRA  (ngoai man hinh)
+
+   No tu kiem tra het roi in ra DUNG VIEC
+   CAN LAM. Cu lam theo danh sach do.
+   Day la nut nen bam DAU TIEN, luon luon.
+
+2. TRANG KHONG LEN / SERVER CHET
+   -> Nhap dup  KHOI-DONG-LAI  (ngoai man hinh)
+      Cho khoang 20 giay.
+
+   Thuong thi khong can lam gi: he thong tu
+   kiem tra 5 phut mot lan va tu bat lai.
+
+3. DIA CHI BI DOI (sau mat dien, doi WiFi)
+   -> Nhap dup loi tat  SUA-IP  (ngoai man hinh)
+
+   No tu tim dia chi moi, sua cau hinh, bat
+   lai server, va ghi danh sach dia chi moi
+   ra file DIA-CHI-1900RETROFOTO.txt ngoai
+   man hinh.
+
+   LUU Y: loi tat tren TUNG MAY TRONG PHONG
+   CHUP van ghi dia chi cu -> phai ra tung
+   phong sua bang tay theo file do.
+
+
+========================================
+  MAY LOI HAY GAP
 ========================================
 
 "Can chay bang quyen Administrator"
@@ -64,6 +104,7 @@ Server bi tat:
 Dien thoai khach khong quet duoc QR
    -> Dien thoai phai noi WIFI CUA QUAN.
       Dung 4G se khong vao duoc.
+   -> Van khong duoc: nhap dup KIEM-TRA.
 
 Trang trang, khong hien gi
    -> Nhan Ctrl + Shift + R trong trinh duyet.
@@ -71,7 +112,23 @@ Trang trang, khong hien gi
 Cong bi chiem
    -> Chay lai CAI-DAT.bat, doi Cong thanh 8095.
 
+Bam "Da chup xong" ma khong thay anh
+   -> Anh phai nam trong thu muc ten dung
+      bang 4 so cua ma, vd E:\Anh\8206\
+
 Chi tiet hon: mo file HUONG-DAN.md
+
+
+========================================
+  VIEC NEN LAM HANG TUAN
+========================================
+
+1. Chep thu muc anh (vd E:\photobooth) sang
+   o cung ngoai. O hong la mat sach.
+
+2. Nhap dup KIEM-TRA mot lan. Mat 15 giay,
+   va no phat hien duoc nhung thu dang am
+   tham sai ma chua ai thay.
 
 
 ========================================

@@ -37,6 +37,10 @@ Source: "..\build\1900Retrofoto\*"; DestDir: "{app}"; \
 
 [Icons]
 Name: "{group}\Trang quan ly"; Filename: "{app}\Mo-trang-quan-ly.cmd"
+Name: "{group}\KIEM TRA (chay khi co van de)"; Filename: "{app}\KIEM-TRA.bat"
+Name: "{group}\Khoi dong lai"; Filename: "{app}\KHOI-DONG-LAI.bat"
+Name: "{group}\Sua dia chi IP"; Filename: "{app}\SUA-IP.bat"
+Name: "{group}\Ghim IP co dinh"; Filename: "{app}\DAT-IP-TINH.bat"
 Name: "{group}\Chay server"; Filename: "{app}\Chay-server.cmd"
 Name: "{group}\Cai dat lai"; Filename: "{app}\CAI-DAT.bat"
 Name: "{group}\Go cai dat"; Filename: "{uninstallexe}"
@@ -48,13 +52,16 @@ Filename: "{app}\CAI-DAT.bat"; \
   Flags: postinstall shellexec
 
 [UninstallRun]
-; Don sach khi go: bo tac vu tu chay va rule firewall
+; Don sach khi go: bo ca hai tac vu va rule firewall
 Filename: "schtasks"; Parameters: "/Delete /TN 1900Retrofoto /F"; \
   Flags: runhidden; RunOnceId: "RemoveTask"
+Filename: "schtasks"; Parameters: "/Delete /TN 1900Retrofoto-TheoDoi /F"; \
+  Flags: runhidden; RunOnceId: "RemoveWatchTask"
 Filename: "powershell"; \
   Parameters: "-NoProfile -Command ""Remove-NetFirewallRule -DisplayName '1900 Retrofoto' -ErrorAction SilentlyContinue"""; \
   Flags: runhidden; RunOnceId: "RemoveFirewall"
 
 [UninstallDelete]
-; Xoa file cau hinh, NHUNG KHONG dong vao thu muc anh khach
+; Xoa file cau hinh va log, NHUNG KHONG dong vao thu muc anh khach
 Type: files; Name: "{app}\.env.local"
+Type: filesandordirs; Name: "{app}\logs"
