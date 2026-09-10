@@ -125,7 +125,7 @@ start http://%IP%:%PORT%/staff
 Write-Host "  [ok] Da tao Mo-trang-quan-ly.cmd"
 
 # --- 10. Huong dan ngan de canh file cai ---
-Copy-Item (Join-Path $AppDir "CAI-DAT.md") (Join-Path $OutDir "HUONG-DAN.md") -Force
+Copy-Item (Join-Path $AppDir "HUONG-DAN-CAI-DAT.md") (Join-Path $OutDir "HUONG-DAN.md") -Force
 Copy-Item (Join-Path $PSScriptRoot "DOC-TRUOC.txt") (Join-Path $OutDir "DOC-TRUOC.txt") -Force
 Write-Host "  [ok] Da chep huong dan"
 
