@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   staffMe, staffLogin, staffLogout, staffSessions, staffRooms, createSession,
-  closeSession, staffSessionDetail, photoUrl, compositeUrl,
+  closeSession, staffSessionDetail, photoUrl, compositeUrl, staffDisk,
   ApiError,
   type SessionInfo, type PhotoInfo, type CompositeInfo, type RoomStatus,
+  type DiskInfo,
 } from '../../api';
 import FramesPanel from './FramesPanel';
 import ColorPanel from './ColorPanel';
+import StoragePanel from './StoragePanel';
 import { useDialog } from './useDialog';
 import './staff.css';
 
@@ -30,6 +32,17 @@ const CLOSABLE = new Set(['created', 'active', 'shooting', 'done', 'composed']);
 
 /** Số phiên hiện mỗi trang — đủ để không phải cuộn trên màn hình thường. */
 const PER_PAGE = 10;
+
+/**
+ * Nhịp đọc lại dung lượng ổ đĩa.
+ *
+ * Chậm hơn nhiều so với nhịp đọc phiên (4 giây): dung lượng thay đổi theo
+ * từng buổi chứ không theo từng giây, mà mỗi lần đọc phải hỏi cả ổ đĩa lẫn
+ * database nên không đáng gọi liên tục.
+ */
+const DISK_POLL_MS = 60_000;
+
+const GB = 1024 ** 3;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -58,7 +71,8 @@ export default function StaffApp() {
   const [maxPhotos, setMaxPhotos] = useState(8);
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
-  const [view, setView] = useState<'sessions' | 'frames' | 'colors'>('sessions');
+  const [view, setView] = useState<'sessions' | 'frames' | 'colors' | 'storage'>('sessions');
+  const [disk, setDisk] = useState<DiskInfo | null>(null);
   const { ask, dialog } = useDialog();
   const [detail, setDetail] = useState<{
     session: SessionInfo; token: string; photos: PhotoInfo[]; composites: CompositeInfo[];
@@ -90,6 +104,15 @@ export default function StaffApp() {
     const t = setInterval(load, 4000);
     return () => clearInterval(t);
   }, [loggedIn, load]);
+
+  /* Chỉ báo ổ đĩa trên thanh tiêu đề — hiện ở mọi tab, kể cả tab khung ảnh. */
+  useEffect(() => {
+    if (!loggedIn) return;
+    const read = () => staffDisk().then((r) => setDisk(r.disk)).catch(() => {});
+    read();
+    const t = setInterval(read, DISK_POLL_MS);
+    return () => clearInterval(t);
+  }, [loggedIn]);
 
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -203,14 +226,43 @@ export default function StaffApp() {
           >
             Chỉnh màu
           </button>
+          <button
+            className={view === 'storage' ? 'on' : ''}
+            onClick={() => setView('storage')}
+          >
+            Ổ đĩa
+          </button>
         </nav>
 
-        <button className="ghost" onClick={() => staffLogout().then(() => setLoggedIn(false))}>
-          Đăng xuất
-        </button>
+        <div className="head-right">
+          {/*
+            Đèn báo dung lượng. Im lặng khi bình thường, đổi màu khi sắp đầy —
+            bấm vào là sang thẳng màn dọn dẹp.
+          */}
+          {disk && (
+            <button
+              className={`disk-chip ${disk.level}`}
+              onClick={() => setView('storage')}
+              title={disk.ok
+                ? `Ổ ${disk.drive} còn ${(disk.freeBytes / GB).toFixed(1)} GB trống`
+                : `Không đọc được ổ ${disk.drive}`}
+            >
+              <span className="dot" />
+              <span className="txt">
+                {disk.ok ? `${(disk.freeBytes / GB).toFixed(0)} GB trống` : 'Lỗi ổ đĩa'}
+              </span>
+            </button>
+          )}
+
+          <button className="ghost" onClick={() => staffLogout().then(() => setLoggedIn(false))}>
+            Đăng xuất
+          </button>
+        </div>
       </header>
 
-      {view === 'frames' ? <FramesPanel /> : view === 'colors' ? <ColorPanel /> : (
+      {view === 'frames' ? <FramesPanel />
+        : view === 'colors' ? <ColorPanel />
+        : view === 'storage' ? <StoragePanel /> : (
       <div className="cols">
       <div className="col-left">
 

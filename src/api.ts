@@ -112,6 +112,41 @@ export const staffSessionDetail = (id: string) =>
     composites: CompositeInfo[];
   }>(`/api/staff/sessions/${id}`);
 
+// ---- Ổ đĩa và dọn dẹp ----
+
+export type DiskInfo = {
+  /** Ổ chứa thư mục ảnh, ví dụ "D:" */
+  drive: string;
+  dataDir: string;
+  totalBytes: number;
+  freeBytes: number;
+  /** Phần ảnh khách đang chiếm, tính từ database. */
+  usedByPhotosBytes: number;
+  level: 'ok' | 'warn' | 'critical';
+  /** Đọc được ổ đĩa hay không. Sai thì các số trên là 0. */
+  ok: boolean;
+};
+
+/** Một mốc dọn dẹp: xoá ảnh cũ hơn `days` ngày thì được bao nhiêu. */
+export type CleanupTier = { days: number; sessions: number; bytes: number };
+
+/**
+ * Dung lượng ổ đĩa.
+ *
+ * `withTiers` chỉ bật ở màn dọn dẹp: tính bảng mốc phải quét bảng ảnh cho
+ * từng mốc, không đáng làm ở nhịp đọc mỗi phút của đèn báo trên tiêu đề.
+ */
+export const staffDisk = (withTiers = false) =>
+  req<{ disk: DiskInfo; tiers?: CleanupTier[]; retentionDays: number }>(
+    `/api/staff/disk${withTiers ? '?tiers=1' : ''}`,
+  );
+
+export const staffCleanup = (days: number) =>
+  req<{ purged: number; disk: DiskInfo; tiers: CleanupTier[] }>(
+    '/api/staff/cleanup',
+    { method: 'POST', body: JSON.stringify({ days }) },
+  );
+
 // ---- Phòng chụp ----
 
 export const claimCode = (room: string, code: string) =>

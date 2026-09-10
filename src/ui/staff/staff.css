@@ -1160,3 +1160,156 @@ button.link.danger { color: var(--danger); }
 }
 
 .composing button.link { padding: 2px 8px; min-height: 26px; font-size: 12px; }
+
+/* =========================================================================
+   Ổ đĩa và dọn dẹp
+   -------------------------------------------------------------------------
+   Con số quan trọng nhất là "còn bao nhiêu trống" nên nó được in to nhất
+   màn hình. Nhân viên không cần đọc chữ để biết có phải lo hay không —
+   chỉ cần nhìn màu.
+   ========================================================================= */
+
+.storage {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.6vh, 18px);
+}
+
+.disk-big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+
+.disk-free {
+  font-family: var(--display);
+  font-size: clamp(30px, 5vw, 46px);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ok);
+}
+
+.disk-big.warn .disk-free { color: var(--warn); }
+.disk-big.critical .disk-free { color: var(--danger); }
+
+.disk-cap { color: var(--text-3); font-size: 14px; }
+
+.disk-bar {
+  height: 12px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin: 12px 0;
+}
+
+.disk-bar .fill { height: 100%; background: var(--ok); transition: width .3s; }
+.disk-bar.warn .fill { background: var(--warn); }
+.disk-bar.critical .fill { background: var(--danger); }
+
+.disk-advice { color: var(--text-2); font-size: 14px; margin: 0; }
+
+.disk-facts {
+  margin: 16px 0 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.disk-facts div { min-width: 0; }
+.disk-facts dt {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-bottom: 3px;
+}
+.disk-facts dd { margin: 0; font-size: 14px; color: var(--text); }
+.disk-facts code { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+
+/*
+ * Mốc dọn dẹp: mỗi nút nói rõ SẼ XOÁ BAO NHIÊU trước khi bấm.
+ * Không có con số đó thì nhân viên phải đoán, và sẽ không dám bấm.
+ */
+.tiers { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+
+.tier {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  min-height: var(--tap);
+  padding: 11px 15px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  transition: border-color .15s, background .15s;
+}
+
+.tier:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.tier:disabled { opacity: .45; cursor: not-allowed; }
+
+.tier-when { font-weight: 600; font-size: 14px; }
+.tier-what { font-size: 12.5px; color: var(--text-2); }
+
+.hint { color: var(--text-2); font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
+.hint:last-child { margin: 12px 0 0; }
+
+.ok-box {
+  background: var(--ok-soft);
+  border: 1px solid var(--ok);
+  color: var(--ok);
+  padding: 11px 15px;
+  border-radius: var(--r);
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+/*
+ * Chỉ báo ổ đĩa trên thanh tiêu đề — luôn nhìn thấy ở mọi tab.
+ *
+ * Ở trạng thái bình thường nó im lặng (chữ xám nhỏ). Chỉ khi sắp đầy mới đổi
+ * màu và nổi lên, nên nhân viên không bị nhiễu suốt ngày nhưng vẫn không thể
+ * bỏ qua lúc cần.
+ */
+.disk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.disk-chip:hover { border-color: var(--accent); color: var(--text); }
+
+.disk-chip .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex: none;
+}
+
+.disk-chip.warn { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+.disk-chip.warn .dot { background: var(--warn); }
+.disk-chip.critical { border-color: var(--danger); color: var(--danger); font-weight: 600; }
+.disk-chip.critical .dot { background: var(--danger); }
+
+@media (max-width: 720px) {
+  /* Trên điện thoại chỉ giữ đèn màu, bỏ chữ — thanh tiêu đề đã hết chỗ */
+  .disk-chip .txt { display: none; }
+}
+
+/* Nhóm phải của thanh tiêu đề: đèn ổ đĩa + đăng xuất đi liền nhau */
+.head-right { display: flex; align-items: center; gap: 8px; flex: none; }

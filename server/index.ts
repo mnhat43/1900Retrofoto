@@ -26,8 +26,10 @@ import {
 import type { DetectedSlot } from './detect.ts';
 import { renderFromOriginals, type Recipe } from './render.ts';
 import { listPresets, createPreset, updatePreset, deletePreset } from './presets.ts';
-import { runCleanup } from './cleanup.ts';
+import { runCleanup, cleanupTiers, purgeOlderThan, CLEANUP_TIERS } from './cleanup.ts';
 import { intakeFromFolder, ensureCaptureDir, captureEnabled, captureDir } from './intake.ts';
+import { diskInfo } from './disk.ts';
+import { logLine, logError, recentLog } from './log.ts';
 
 const DIST = resolve(process.cwd(), 'dist');
 
@@ -103,6 +105,72 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     const rooms = url.searchParams.get('rooms') ?? '';
     agentSeen(rooms.split(',').filter(Boolean));
     json(res, 200, { ok: true });
+    return true;
+  }
+
+  /**
+   * Kiểm tra sức khoẻ — KHÔNG cần đăng nhập.
+   *
+   * Tác vụ theo dõi và KIEM-TRA.bat phải trả lời được câu "server còn sống
+   * không" trước khi có ai đăng nhập. Chỉ trả thông tin vô hại: không có
+   * đường dẫn ổ đĩa, không có mật khẩu.
+   */
+  if (path === '/api/health') {
+    const d = diskInfo();
+    json(res, 200, {
+      ok: true,
+      uptimeSeconds: Math.round(process.uptime()),
+      host: process.env.PHOTOBOOTH_HOST ?? `${lanAddress()}:${CONFIG.port}`,
+      port: CONFIG.port,
+      rooms: CONFIG.rooms,
+      disk: { level: d.level, freeBytes: d.freeBytes, totalBytes: d.totalBytes },
+    });
+    return true;
+  }
+
+  // ---- Nhân viên: ổ đĩa và dọn dẹp ----
+
+  /**
+   * Thông tin ổ đĩa. Mặc định KHÔNG kèm bảng mốc dọn dẹp.
+   *
+   * Đèn báo trên thanh tiêu đề gọi endpoint này mỗi phút và chỉ cần mức cảnh
+   * báo. Còn bảng mốc phải cộng dung lượng trong bảng photos/composites cho
+   * từng mốc một, nên chỉ tính khi màn dọn dẹp thực sự được mở (?tiers=1).
+   */
+  if (path === '/api/staff/disk' && method === 'GET') {
+    if (requireStaff(ctx)) return true;
+    json(res, 200, {
+      disk: diskInfo(),
+      retentionDays: CONFIG.retentionDays,
+      tiers: url.searchParams.get('tiers') === '1' ? cleanupTiers() : undefined,
+    });
+    return true;
+  }
+
+  /**
+   * Nhân viên tự bấm dọn ảnh cũ hơn N ngày.
+   *
+   * Chỉ nhận đúng các mốc trong CLEANUP_TIERS, không cho truyền số tuỳ ý —
+   * tránh việc gõ nhầm 0 rồi xoá sạch ảnh của khách còn đang chờ lấy.
+   */
+  if (path === '/api/staff/cleanup' && method === 'POST') {
+    if (requireStaff(ctx)) return true;
+    const body = await readJson<{ days?: number }>(req);
+    const days = Number(body.days);
+    if (!(CLEANUP_TIERS as readonly number[]).includes(days)) {
+      json(res, 400, { error: 'Mốc dọn dẹp không hợp lệ' });
+      return true;
+    }
+    const { purged } = purgeOlderThan(days);
+    logLine(`Nhân viên dọn ảnh cũ hơn ${days} ngày -> đã xoá ${purged} phiên`);
+    json(res, 200, { purged, disk: diskInfo(), tiers: cleanupTiers() });
+    return true;
+  }
+
+  /** Mấy dòng log cuối — để chẩn đoán mà không cần mở File Explorer. */
+  if (path === '/api/staff/log' && method === 'GET') {
+    if (requireStaff(ctx)) return true;
+    json(res, 200, { lines: recentLog(60) });
     return true;
   }
 
@@ -610,7 +678,21 @@ function sendFile(res: import('node:http').ServerResponse, abs: string): void {
         : 'private, max-age=3600',
     'referrer-policy': 'no-referrer',
   });
-  createReadStream(abs).pipe(res);
+  const stream = createReadStream(abs);
+  /*
+   * BẮT BUỘC phải có listener 'error'.
+   *
+   * existsSync ở trên chỉ đúng tại đúng thời điểm kiểm tra. Ngay sau đó job
+   * dọn dẹp có thể xoá đúng thư mục này (khách đang tải ảnh lúc dọn dẹp chạy),
+   * ổ rời có thể bị rút, phần mềm diệt virus có thể đang giữ file. Stream lỗi
+   * mà không ai nghe thì Node coi là uncaught exception và THOÁT CẢ TIẾN
+   * TRÌNH — mất server giữa buổi bán hàng chỉ vì một file ảnh.
+   */
+  stream.on('error', (err) => {
+    logError(`Không đọc được file ${abs}`, err);
+    res.destroy();
+  });
+  stream.pipe(res);
 }
 
 // ---------------------------------------------------------------------------
@@ -649,14 +731,45 @@ const publicComposite = (c: import('./composite.ts').Composite) => ({
 });
 
 /** Địa chỉ LAN để nhúng vào QR — khách quét phải ra IP máy chủ, không phải localhost. */
+/**
+ * Card mạng ẢO cần bỏ qua khi đi tìm địa chỉ LAN.
+ *
+ * Vì sao đây là chỗ nguy hiểm nhất trong file: mã QR đưa cho khách được dựng
+ * từ địa chỉ này. Máy nào có cài WSL, Docker, VirtualBox hay VPN đều mọc thêm
+ * card ảo (172.x, 192.168.56.x). Chọn nhầm card thì QR trỏ vào nơi điện thoại
+ * khách không bao giờ tới được — trong khi trang quản lý trên máy chủ vẫn mở
+ * bình thường, nên không ai phát hiện ra cho tới khi khách phàn nàn.
+ */
+const VIRTUAL_NIC =
+  /vethernet|wsl|hyper-v|virtualbox|vmware|docker|loopback|tailscale|zerotier|tap-|tun|bluetooth|npcap/i;
+
+/**
+ * Chấm điểm địa chỉ theo mức "giống mạng LAN của quán".
+ * 192.168.x là kiểu router gia đình/quán cà phê hay dùng nhất nên ưu tiên cao.
+ */
+function lanScore(addr: string): number {
+  if (addr.startsWith('192.168.')) return 3;
+  if (addr.startsWith('10.')) return 2;
+  const m = addr.match(/^172\.(\d+)\./);
+  if (m && Number(m[1]) >= 16 && Number(m[1]) <= 31) return 1;
+  return 0;
+}
+
 export function lanAddress(): string {
   if (process.env.PHOTOBOOTH_HOST) return process.env.PHOTOBOOTH_HOST;
-  for (const list of Object.values(networkInterfaces())) {
+
+  const found: Array<{ addr: string; score: number }> = [];
+  for (const [name, list] of Object.entries(networkInterfaces())) {
+    if (VIRTUAL_NIC.test(name)) continue;
     for (const ni of list ?? []) {
-      if (ni.family === 'IPv4' && !ni.internal) return ni.address;
+      if (ni.family !== 'IPv4' || ni.internal) continue;
+      // 169.254.x: Windows tự gán khi xin DHCP thất bại -> không ai tới được
+      if (ni.address.startsWith('169.254.')) continue;
+      found.push({ addr: ni.address, score: lanScore(ni.address) });
     }
   }
-  return 'localhost';
+  found.sort((a, b) => b.score - a.score);
+  return found[0]?.addr ?? 'localhost';
 }
 
 async function makeQr(ctx: Ctx, token: string) {
@@ -714,6 +827,29 @@ function serveStatic(ctx: Ctx): void {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Lưới an toàn cấp tiến trình.
+ *
+ * Đường xử lý request đã có try/catch riêng (xem createServer bên dưới),
+ * nhưng lỗi sinh ra NGOÀI đường đó — trong stream, trong timer, trong callback
+ * của thư viện — vẫn giết cả server.
+ *
+ * Ở đây chọn GHI LOG RỒI CHẠY TIẾP thay vì thoát, ngược với lời khuyên chung
+ * cho server web. Lý do: máy này là thiết bị đặt ở quán. Chết 5 phút chờ tác
+ * vụ theo dõi bật lại là mất khách thật, còn chạy tiếp sau một lỗi lẻ thì gần
+ * như luôn an toàn hơn — mỗi request tự cô lập trạng thái của nó, và SQLite
+ * ghi theo giao dịch nên không để lại dữ liệu nửa vời.
+ *
+ * CHỈ gọi khi chạy như tiến trình chính (xem cuối file), KHÔNG gọi trong
+ * start(): các script kiểm chứng cũng gọi start(), và nếu bọc luôn cho chúng
+ * thì một lỗi bất ngờ trong script sẽ bị ghi log rồi bỏ qua — script vẫn báo
+ * "OK". Đúng chỗ đó thì fail-fast mới là hành vi cần.
+ */
+function installProcessGuards(): void {
+  process.on('uncaughtException', (err) => logError('Lỗi không bắt được', err));
+  process.on('unhandledRejection', (reason) => logError('Promise bị bỏ lỡ', reason));
+}
+
 export function start(port = CONFIG.port) {
   warnIfInsecure();
   getDb();
@@ -740,6 +876,25 @@ export function start(port = CONFIG.port) {
     }
   });
 
+  /*
+   * Cổng bị chiếm là lỗi hay gặp nhất lúc khởi động: lần chạy trước chưa tắt
+   * hẳn, hoặc IIS/Skype đang giữ cổng. Không bắt ở đây thì Node ném
+   * EADDRINUSE ra ngoài, tiến trình chết im lặng, và tác vụ theo dõi cứ bật
+   * lại rồi chết lại mỗi 5 phút suốt cả ngày mà không ai hiểu vì sao.
+   */
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      logLine(`Cổng ${port} đang bị chương trình khác dùng — server không chạy được`);
+      console.error(
+        `\n  KHÔNG CHẠY ĐƯỢC: cổng ${port} đang bị chương trình khác dùng.` +
+          `\n  Cách xử lý: chạy lại CAI-DAT.bat, đổi Cổng thành ${port + 5}.\n`,
+      );
+    } else {
+      logError('Lỗi máy chủ', err);
+    }
+    process.exit(1);
+  });
+
   server.listen(port, () => {
     // PHOTOBOOTH_HOST có thể đã kèm sẵn cổng -> không thêm lần nữa
     const host = process.env.PHOTOBOOTH_HOST ?? `${lanAddress()}:${port}`;
@@ -760,5 +915,6 @@ export function start(port = CONFIG.port) {
 // "file:///E:/..." (ba dấu gạch) còn ghép tay ra "file://E:/..." (hai dấu),
 // không bao giờ khớp -> server im lặng thoát ngay mà không báo gì.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  installProcessGuards();
   start();
 }
