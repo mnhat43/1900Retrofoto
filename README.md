@@ -104,6 +104,19 @@ ngay. Muốn chạy luôn: nhấp đúp `start-server.cmd` (để cửa sổ đ�
 
 Sau khi khởi động lại máy thì server tự chạy, không cần làm gì.
 
+### Gỡ khỏi máy
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\go-cai-dat.ps1
+```
+
+Dừng server, bỏ tác vụ tự chạy (cả `PhotoBoothStudio` của bản cài cũ), đóng
+firewall, trả lại chế độ ngủ mặc định và IP động, xoá lối tắt cùng
+`.env.local`.
+
+**Ảnh khách được giữ nguyên** — script chỉ in đường dẫn ra. Muốn xoá luôn thì
+thêm `-XoaDuLieu`, và còn phải gõ đúng tên thư mục để xác nhận.
+
 ### Trang trắng, không load được?
 
 Nếu mở bằng Chrome thường bị treo nhưng **tab ẩn danh vào được**, là do Chrome

@@ -132,6 +132,26 @@ Chi tiet hon: mo file HUONG-DAN.md
 
 
 ========================================
+  GO BO KHOI MAY
+========================================
+
+Chuot phai vao  GO-CAI-DAT.bat
+chon "Run as administrator", go chu g
+va Enter.
+
+No tu dung server, bo phan tu chay moi
+lan bat may, dong firewall, tra lai che
+do ngu va dia chi mang nhu cu.
+
+ANH KHACH KHONG BI XOA. Script in ra
+duong dan thu muc anh de ban tu chep di
+noi khac truoc khi xoa.
+
+Sau do vao Settings > Apps go not
+"1900 Retrofoto" khoi may.
+
+
+========================================
   BAN MOI
 ========================================
 

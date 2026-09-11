@@ -45,6 +45,7 @@ Name: "{group}\Sua dia chi IP"; Filename: "{app}\SUA-IP.bat"
 Name: "{group}\Ghim IP co dinh"; Filename: "{app}\DAT-IP-TINH.bat"
 Name: "{group}\Chay server"; Filename: "{app}\Chay-server.cmd"
 Name: "{group}\Cai dat lai"; Filename: "{app}\CAI-DAT.bat"
+Name: "{group}\Go cai dat (don sach may)"; Filename: "{app}\GO-CAI-DAT.bat"
 Name: "{group}\Go cai dat"; Filename: "{uninstallexe}"
 
 [Run]
@@ -54,14 +55,19 @@ Filename: "{app}\CAI-DAT.bat"; \
   Flags: postinstall shellexec
 
 [UninstallRun]
-; Don sach khi go: bo ca hai tac vu va rule firewall
-Filename: "schtasks"; Parameters: "/Delete /TN 1900Retrofoto /F"; \
-  Flags: runhidden; RunOnceId: "RemoveTask"
-Filename: "schtasks"; Parameters: "/Delete /TN 1900Retrofoto-TheoDoi /F"; \
-  Flags: runhidden; RunOnceId: "RemoveWatchTask"
+; Don sach khi go. Goi go-cai-dat.ps1 thay vi tu chay vai lenh schtasks: script
+; do bo tac vu TRUOC roi moi giet tien trinh (tac vu chinh lap 5 phut mot lan,
+; giet truoc thi no bat server day ngay), va con tra lai che do ngu, dia chi IP
+; tu dong, ngoai le Defender, loi tat - nhung thu ban [UninstallRun] cu bo sot.
+;
+; -Force = khong hoi gi (khong co ai ngoi truoc man hinh luc Windows go).
+; KHONG truyen -XoaDuLieu: anh khach phai duoc giu lai.
+;
+; waituntilterminated: phai xong han truoc khi Inno xoa file, vi script nam
+; trong thu muc dang bi go va server con chay thi no giu file trong {app}.
 Filename: "powershell"; \
-  Parameters: "-NoProfile -Command ""Remove-NetFirewallRule -DisplayName '1900 Retrofoto' -ErrorAction SilentlyContinue"""; \
-  Flags: runhidden; RunOnceId: "RemoveFirewall"
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\go-cai-dat.ps1"" -Force"; \
+  Flags: runhidden waituntilterminated; RunOnceId: "GoSach"
 
 [UninstallDelete]
 ; Xoa file cau hinh va log, NHUNG KHONG dong vao thu muc anh khach

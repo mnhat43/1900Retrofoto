@@ -102,11 +102,33 @@ rất có thể nó đang khởi động, giết lúc đó sẽ thành vòng l�
 | `SUA-IP.bat` | Ghim lại địa chỉ sau khi IP đổi |
 | `DAT-IP-TINH.bat` | Chuyển DHCP sang IP tĩnh, có đường lùi |
 | `CAP-NHAT.bat` | Chép bản mới đè bản đang chạy, giữ nguyên cấu hình |
+| `GO-CAI-DAT.bat` | Gỡ sạch khỏi máy — **không đụng vào ảnh khách** |
 
-Năm file `.bat` cuối **tự xin quyền Administrator** (`Start-Process -Verb
+Sáu file `.bat` cuối **tự xin quyền Administrator** (`Start-Process -Verb
 RunAs`) thay vì bắt nhân viên nhớ chuột phải.
 
 `react` và `react-dom` bị loại — chỉ dùng lúc build, không cần khi chạy.
+
+### `GO-CAI-DAT` gỡ những gì
+
+Đảo ngược đúng những gì `CAI-DAT.bat` đã làm, **theo thứ tự bắt buộc**: bỏ hai
+tác vụ trước, rồi mới giết tiến trình. Ngược lại thì tác vụ chính (lặp 5
+phút/lần) bật server dậy ngay giữa lúc đang gỡ, và người gỡ thấy "gỡ xong mà
+vẫn còn chạy".
+
+Gỡ: hai tác vụ (kể cả `PhotoBoothStudio` của bản cài cũ bằng
+`install-windows.ps1`), tiến trình server, rule firewall, ngoại lệ Defender,
+lối tắt ngoài màn hình, `.env.local` và `logs\`.
+
+Trả lại: chế độ ngủ mặc định, và địa chỉ IP động nếu `DAT-IP-TINH` từng ghim.
+
+**Ảnh khách được giữ nguyên** — script chỉ in đường dẫn và dung lượng ra màn
+hình. Muốn xoá phải chạy tay với `-XoaDuLieu` *và* gõ đúng tên thư mục để xác
+nhận. Hai lớp, vì ảnh khách không có bản sao nào khác.
+
+Trình gỡ cài đặt của Windows (Settings → Apps) cũng gọi chính script này với
+`-Force` (không hỏi, không xoá dữ liệu) trước khi xoá file — xem
+`[UninstallRun]` trong `installer.iss`.
 
 ---
 

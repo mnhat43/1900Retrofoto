@@ -142,7 +142,7 @@ function Write-BatFile([string]$Path, [string]$Text) {
 foreach ($s in @(
     "lib-net.ps1", "setup-gui.ps1", "theo-doi.ps1",
     "kiem-tra.ps1", "sua-ip.ps1", "dat-ip-tinh.ps1", "khoi-dong-lai.ps1",
-    "cap-nhat.ps1"
+    "cap-nhat.ps1", "go-cai-dat.ps1"
   )) {
   Copy-Item (Join-Path $PSScriptRoot $s) $OutDir -Force
 }
@@ -222,12 +222,13 @@ foreach ($pair in @(
     @("SUA-IP.bat", "sua-ip.ps1", $true),
     @("DAT-IP-TINH.bat", "dat-ip-tinh.ps1", $true),
     # Chay tu goi MOI vua giai nen, tro sang ban cu dang chay de thay file
-    @("CAP-NHAT.bat", "cap-nhat.ps1", $true)
+    @("CAP-NHAT.bat", "cap-nhat.ps1", $true),
+    @("GO-CAI-DAT.bat", "go-cai-dat.ps1", $true)
   )) {
   $tpl = if ($pair[2]) { $elevated } else { $plain }
   Write-BatFile (Join-Path $OutDir $pair[0]) $tpl.Replace('__SCRIPT__', $pair[1])
 }
-Write-Host "  [ok] Da tao KIEM-TRA / KHOI-DONG-LAI / SUA-IP / DAT-IP-TINH / CAP-NHAT"
+Write-Host "  [ok] Da tao KIEM-TRA / KHOI-DONG-LAI / SUA-IP / DAT-IP-TINH / CAP-NHAT / GO-CAI-DAT"
 
 # --- 10. Loi tat mo trang quan ly ---
 #
