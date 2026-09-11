@@ -149,6 +149,50 @@ describe('detectSlots', () => {
     await expect(detectSlots(solid)).rejects.toThrow(/trong suốt/);
   });
 
+  /*
+   * Điều kiện là CÓ ALPHA, không phải "đuôi .png". Nhân viên xuất khung từ
+   * Canva/Figma/Photoshop ra WebP hay AVIF là chuyện thường, và những file đó
+   * giữ được vùng trong suốt y hệt PNG.
+   */
+  it('dò được khung ở mọi định dạng giữ được vùng trong suốt', async () => {
+    const png = await frameWithHoles(400, 600, [
+      { x: 0.1, y: 0.1, w: 0.8, h: 0.3 },
+      { x: 0.1, y: 0.55, w: 0.8, h: 0.3 },
+    ]);
+
+    const cases: Array<[string, Buffer]> = [
+      ['webp', await sharp(png).webp({ lossless: true }).toBuffer()],
+      ['avif', await sharp(png).avif().toBuffer()],
+      ['gif', await sharp(png).gif().toBuffer()],
+      // TIFF giữ alpha khi nén LZW; mặc định của sharp là nén JPEG bên trong
+      // và rụng mất kênh alpha. Nhận file nào còn alpha, không hứa cả họ TIFF.
+      ['tiff-lzw', await sharp(png).tiff({ compression: 'lzw' }).toBuffer()],
+    ];
+
+    for (const [ten, buf] of cases) {
+      const r = await detectSlots(buf);
+      expect(r.slots.length, `${ten}: số ô`).toBe(2);
+      expect(r.width, `${ten}: bề rộng`).toBe(400);
+    }
+  });
+
+  /*
+   * JPEG không lưu được độ trong suốt, nên đây là ngõ cụt chứ không phải lỗi
+   * tạm thời — thông báo phải nói thẳng ra để khỏi thử lại vô ích.
+   */
+  it('nói rõ JPG không dùng làm khung được', async () => {
+    const jpg = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    }).jpeg().toBuffer();
+
+    await expect(detectSlots(jpg)).rejects.toThrow(/JPG/);
+  });
+
+  it('báo lỗi đọc file khi đưa vào thứ không phải ảnh', async () => {
+    await expect(detectSlots(Buffer.from('day khong phai anh')))
+      .rejects.toThrow(/Không đọc được/);
+  });
+
   it('không tràn ngăn xếp với vùng trong suốt rất lớn', async () => {
     /*
      * Một lỗ rất lớn -> vùng hàng triệu pixel; cài đặt đệ quy sẽ chết ở đây.

@@ -175,10 +175,16 @@ export default function FramesPanel() {
           </p>
         </div>
         <div>
+          {/*
+            Mọi định dạng ảnh giữ được vùng trong suốt. KHÔNG có JPG: định
+            dạng đó không lưu được độ trong suốt, mà cả cơ chế khung dựa vào
+            đúng thứ đó để biết lỗ nằm ở đâu. Để JPG lọt vào hộp chọn file chỉ
+            khiến nhân viên chọn rồi nhận lỗi.
+          */}
           <input
             ref={fileInput}
             type="file"
-            accept="image/png"
+            accept="image/png,image/webp,image/avif,image/gif"
             hidden
             onChange={(e) => onPick(e.target.files?.[0])}
           />

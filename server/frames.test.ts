@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { rmSync, mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import sharp from 'sharp';
 
 const dir = mkdtempSync(join(tmpdir(), 'pb-frames-'));
 process.env.PHOTOBOOTH_DATA = dir;
@@ -73,6 +74,53 @@ describe('kích thước in tuỳ ý', () => {
     const u = updateFrame(f.id, { widthInch: 3, heightInch: 4 });
     expect(u?.widthInch).toBe(3);
     expect(u?.heightInch).toBe(4);
+  });
+});
+
+describe('tải lên định dạng khác PNG', () => {
+  /*
+   * File lưu ra luôn mang tên .png và mọi nơi phục vụ nó đều khai
+   * 'content-type: image/png'. Ghi thẳng buffer WebP vào đó thì thành file
+   * đội lốt: trình duyệt cũ và khâu in từ chối, mà triệu chứng chỉ là "khung
+   * không hiện". Nên phải chuyển đổi thật khi lưu.
+   */
+  it('chuyển WebP sang PNG thật khi lưu, giữ nguyên vùng trong suốt', async () => {
+    const webp = await sharp(png3).webp({ lossless: true }).toBuffer();
+    const f = await createFrame({ label: 'Tu WebP', png: webp });
+
+    const saved = readFrameImage(f.id)!;
+    // Magic bytes của PNG, không tin vào đuôi file
+    expect(saved[0]).toBe(0x89);
+    expect(saved.subarray(1, 4).toString()).toBe('PNG');
+
+    const meta = await sharp(saved).metadata();
+    expect(meta.format).toBe('png');
+    expect(meta.hasAlpha).toBe(true);
+    expect(f.slotCount).toBe(3);
+  });
+
+  it('nhận cả AVIF và GIF', async () => {
+    for (const [ten, buf] of [
+      ['avif', await sharp(png3).avif().toBuffer()],
+      ['gif', await sharp(png3).gif().toBuffer()],
+    ] as Array<[string, Buffer]>) {
+      const f = await createFrame({ label: `Tu ${ten}`, png: buf });
+      const saved = readFrameImage(f.id)!;
+      expect((await sharp(saved).metadata()).format, ten).toBe('png');
+      expect(f.slotCount, ten).toBe(3);
+    }
+  });
+
+  it('KHÔNG nén lại khi vốn đã là PNG', async () => {
+    // Chuyển đổi thừa vừa tốn thời gian vừa có thể làm đổi file gốc
+    const f = await createFrame({ label: 'Von la PNG', png: png3 });
+    expect(readFrameImage(f.id)!.equals(png3)).toBe(true);
+  });
+
+  it('từ chối JPG với lời giải thích, không lưu gì', async () => {
+    const jpg = await sharp(png3).flatten({ background: '#fff' }).jpeg().toBuffer();
+    await expect(createFrame({ label: 'Tu JPG', png: jpg })).rejects.toThrow(/JPG/);
+    expect(listFrames().length).toBe(0);
   });
 });
 

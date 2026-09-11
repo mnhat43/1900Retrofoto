@@ -100,16 +100,44 @@ function readingOrder(slots: DetectedSlot[]): DetectedSlot[] {
 }
 
 /**
- * Đọc PNG và trả về các ô dò được.
+ * Đọc file khung và trả về các ô dò được.
+ *
+ * Nhận mọi định dạng sharp đọc được MIỄN LÀ có kênh alpha (PNG, WebP, AVIF,
+ * GIF, và cả TIFF nén LZW). Điều kiện thật sự là độ trong suốt chứ không phải
+ * đuôi file: cả cơ chế khung dựa vào việc đọc alpha để biết lỗ nằm ở đâu.
+ *
+ * Hộp chọn file chỉ gợi ý bốn loại đầu. TIFF tuỳ tuỳ chọn nén mà còn hay mất
+ * alpha, nên không hứa trước — file nào còn thì vẫn nhận.
  *
  * Ném lỗi nếu file không có kênh alpha — ảnh đặc thì không có lỗ nào, mà báo
- * "tìm thấy 0 ô" thì người dùng không biết vì sao.
+ * "tìm thấy 0 ô" thì người dùng không biết vì sao. JPEG luôn rơi vào nhánh
+ * này: định dạng đó không lưu được độ trong suốt, nên nói thẳng ra thay vì
+ * để người dùng thử đi thử lại.
  */
 export async function detectSlots(png: Buffer): Promise<DetectResult> {
   const img = sharp(png);
-  const meta = await img.metadata();
+
+  let meta;
+  try {
+    meta = await img.metadata();
+  } catch {
+    // sharp không nhận ra định dạng: file hỏng, hoặc không phải ảnh
+    throw new Error('Không đọc được file này. Hãy chọn ảnh PNG, WebP, AVIF hoặc GIF.');
+  }
+
   if (!meta.hasAlpha) {
-    throw new Error('File khung phải là PNG có nền trong suốt');
+    const loai = (meta.format ?? '').toUpperCase();
+    // JPEG là nhầm lẫn hay gặp nhất, và không có đường sửa bằng cách đổi
+    // tuỳ chọn xuất file - nói rõ để khỏi thử lại vô ích.
+    if (loai === 'JPEG' || loai === 'JPG') {
+      throw new Error(
+        'File JPG không lưu được vùng trong suốt nên không dùng làm khung được. '
+        + 'Xuất lại khung thành PNG (nền trong suốt) rồi tải lên.',
+      );
+    }
+    throw new Error(
+      `File khung phải có nền trong suốt (vùng để lộ ảnh khách).${loai ? ` File này là ${loai} đặc.` : ''}`,
+    );
   }
 
   const { data, info } = await img

@@ -3,6 +3,8 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync } from 'node
 import { writeFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 
+import sharp from 'sharp';
+
 import { CONFIG } from './config.ts';
 import { getDb, now } from './db.ts';
 import { detectSlots, type DetectedSlot } from './detect.ts';
@@ -261,8 +263,24 @@ export async function createFrame(opts: {
   const id = randomUUID();
   const filename = `${id}.png`;
 
+  /*
+   * Lưu thành PNG THẬT, không ghi thẳng buffer gốc.
+   *
+   * Nhân viên tải lên được cả WebP/AVIF/GIF, nhưng file lưu ra tên .png và
+   * mọi nơi phục vụ nó đều khai 'content-type: image/png'. Ghi nguyên buffer
+   * thì thành file WebP đội lốt PNG — trình duyệt cũ và khâu in sẽ từ chối,
+   * mà triệu chứng chỉ là "khung không hiện" chứ không nói vì sao.
+   *
+   * GIF nhiều khung thì chỉ lấy khung đầu: khung ảnh là hình tĩnh, và
+   * detectSlots cũng chỉ đọc khung đầu nên toạ độ ô mới khớp với file lưu ra.
+   */
+  const kieuFile = (await sharp(opts.png).metadata()).format;
+  const pngData = kieuFile === 'png'
+    ? opts.png
+    : await sharp(opts.png, { animated: false }).png().toBuffer();
+
   mkdirSync(framesDir(), { recursive: true });
-  await writeFile(framePath(filename), opts.png);
+  await writeFile(framePath(filename), pngData);
 
   const maxOrder = (db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM frames')
     .get() as { m: number }).m;
