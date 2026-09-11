@@ -57,6 +57,15 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+/**
+ * Tình trạng server. Không cần đăng nhập — KIEM-TRA.bat cũng gọi đúng đường
+ * này, và trang nhân viên đọc `version` để hiện bản đang chạy.
+ */
+export const health = () =>
+  req<{ ok: true; version: string; uptimeSeconds: number; host: string }>(
+    '/api/health',
+  );
+
 // ---- Nhân viên ----
 
 export const staffMe = () =>

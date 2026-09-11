@@ -112,25 +112,77 @@ RunAs`) thay vì bắt nhân viên nhớ chuột phải.
 
 ## Cập nhật bản mới
 
-**Với file .exe:** đóng gói lại rồi cài đè lên bản cũ.
+Phía bạn: bump version → đóng gói → nén ZIP → tag → `gh release create`.
+Xem *Phát hành một bản* bên dưới.
 
-**Với ZIP:** người dùng giải nén gói mới ra một thư mục *khác* (ví dụ
-`Downloads\1900Retrofoto`), rồi chuột phải **`CAP-NHAT.bat`** trong đó →
-*Run as administrator*. Script tự tìm bản đang chạy, dừng server, thay file,
-bật lại.
+Phía quán: **không phải làm gì cả ngoài nhấp đúp lối tắt `CAP-NHAT`**. Script
+hỏi `releases/latest` của GitHub, so với `version` trong `package.json` của
+bản đang cài, có bản mới thì tự tải ZIP về `%TEMP%`, giải nén và thay.
 
-Vì sao không bảo họ chép đè bằng tay: chép đè cả thư mục là mất `.env.local`
-— mất mật khẩu và mất địa chỉ in vào mã QR, mà triệu chứng chỉ là "server
-không lên", không ai đoán ra nguyên nhân. `CAP-NHAT.bat` sao lưu file đó ra
-`%TEMP%` trước khi động vào bất cứ thứ gì.
+### Hai chế độ của `CAP-NHAT`
 
-Script còn tắt **cả hai** tác vụ Windows trước khi chép. Nếu không, tác vụ
-chính bật lại sau 5 phút hoặc watchdog nhảy vào đúng lúc đang chép dở và
-khoá file lại.
+Script tự nhận ra đang ở chế độ nào bằng cách so thư mục chứa nó với thư mục
+cài đặt:
+
+| Thư mục chứa script | Chế độ | Làm gì |
+|---|---|---|
+| Chính thư mục cài đặt (lối tắt trỏ vào đây) | **Tự động** | Hỏi GitHub, tải, giải nén, rồi gọi lại chính nó ở chế độ tay |
+| Một thư mục vừa giải nén | **Tay** | Thay file luôn từ đó. Dùng khi quán không ra Internet |
+
+Ở chế độ tự động nó **giao việc thay file cho `cap-nhat.ps1` của bản MỚI**
+(`-NewDir <temp> -OldDir <cài đặt> -Yes`), không tự làm tiếp. Nhờ vậy bản mới
+đổi cách cập nhật thì bản cũ không cần biết trước.
+
+### Những chỗ dễ hỏng mà script phải lo
+
+- **Chép đè bằng tay là mất `.env.local`** — mất mật khẩu và mất địa chỉ in
+  vào mã QR, mà triệu chứng chỉ là "server không lên". Script sao lưu file đó
+  ra `%TEMP%` **trước** khi động vào bất cứ thứ gì, và khôi phục từ bản sao
+  chứ không tin là nó còn nguyên.
+- **Watchdog nhảy vào giữa chừng** — tắt **cả hai** tác vụ Windows trước khi
+  chép, bật lại sau (kể cả khi thất bại).
+- **`Copy-Item -Recurse` vào thư mục đang tồn tại** chép *lồng vào trong*
+  (`dist\dist\...`) chứ không ghi đè → xoá đích trước rồi mới chép.
+- **TLS 1.2** — Windows 10 đời cũ mặc định còn TLS 1.0, GitHub từ chối.
+- **`$ProgressPreference`** — thanh tiến trình làm `Invoke-WebRequest` tải
+  file 44 MB chậm hàng chục lần.
+
+### Version là thứ load-bearing
+
+`CAP-NHAT` so `package.json` với tag GitHub để quyết định có cập nhật không.
+**Quên bump `package.json` là mọi máy ngoài quán kẹt ở bản cũ vĩnh viễn** mà
+không báo gì — nó chỉ lặng lẽ nói *"đang dùng bản mới nhất"*.
+
+`package-app.ps1` chặn ngay tại khâu đóng gói: từ chối chạy nếu `package.json`
+còn `0.0.0`, hoặc nếu hai số đầu không khớp `AppVersion` trong `installer.iss`.
+
+Số này hiện ở ba chỗ để đối chiếu: góc trên trang nhân viên, dòng đầu của
+`KIEM-TRA`, và `/api/health`.
 
 **Dữ liệu khách an toàn:** ảnh, database và khung ảnh nhân viên tải lên đều
 nằm ở thư mục riêng theo `PHOTOBOOTH_DATA` (ví dụ `D:\photobooth`), không nằm
 trong thư mục cài đặt. Gỡ cài đặt cũng không đụng vào.
+
+---
+
+## Phát hành một bản
+
+```powershell
+# 1. Bump: package.json "version" = 1.3.0  va installer.iss AppVersion = "1.3"
+# 2. Kiem tra
+npm run build; npx vitest run; npm run verify
+
+# 3. Dong goi (tu chan neu hai so tren lech nhau)
+powershell -ExecutionPolicy Bypass -File scripts\package-app.ps1
+Compress-Archive -Path build\1900Retrofoto -DestinationPath build\1900Retrofoto.zip -CompressionLevel Optimal
+
+# 4. Phat hanh
+git tag -a v1.3.0 -m "..."; git push origin main; git push origin v1.3.0
+gh release create v1.3.0 build\1900Retrofoto.zip --title "..." --notes-file <file>
+```
+
+> ⚠️ Tên asset phải đúng `1900Retrofoto.zip`. `CAP-NHAT` tìm asset theo tên
+> này; đặt khác là mọi máy báo *"bản mới không kèm file 1900Retrofoto.zip"*.
 
 ---
 

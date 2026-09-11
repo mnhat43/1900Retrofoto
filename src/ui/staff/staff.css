@@ -96,6 +96,19 @@
 
 .staff > header .brand { font-size: 22px; }
 
+/*
+ * So phien ban. Phai doc duoc khi can, nhung khong duoc tranh cho voi logo —
+ * ca ngay nhan vien khong nhin toi no, chi dung khi cap nhat hoac goi ho tro.
+ */
+.staff > header .brand .ver {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-2);
+  align-self: center;
+}
+
 .staff h2 {
   font-size: 12px;
   font-weight: 700;

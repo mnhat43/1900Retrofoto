@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   staffMe, staffLogin, staffLogout, staffSessions, staffRooms, createSession,
-  closeSession, staffSessionDetail, photoUrl, compositeUrl, staffDisk,
+  closeSession, staffSessionDetail, photoUrl, compositeUrl, staffDisk, health,
   ApiError,
   type SessionInfo, type PhotoInfo, type CompositeInfo, type RoomStatus,
   type DiskInfo,
@@ -82,6 +82,11 @@ export default function StaffApp() {
   const [page, setPage] = useState(0);
   const [view, setView] = useState<'sessions' | 'frames' | 'colors' | 'storage'>('sessions');
   const [disk, setDisk] = useState<DiskInfo | null>(null);
+  /**
+   * Phiên bản đang chạy. Đọc một lần lúc mở trang — chỉ đổi khi cập nhật,
+   * mà cập nhật thì server khởi động lại và nhân viên nạp lại trang.
+   */
+  const [version, setVersion] = useState('');
   const { ask, dialog } = useDialog();
   /** Phiên đang được chìa QR ra cho khách quét lại. */
   const [qrFor, setQrFor] = useState<{ id: string; code: string } | null>(null);
@@ -108,6 +113,7 @@ export default function StaffApp() {
       setReady(true);
       if (r.staff) load();
     });
+    health().then((r) => setVersion(r.version)).catch(() => {});
   }, [load]);
 
   useEffect(() => {
@@ -216,6 +222,12 @@ export default function StaffApp() {
       <header>
         <span className="brand">
           <span className="n">1900</span><span className="w">Retrofoto</span>
+          {/*
+            Số bản đang chạy. Cần khi hỏi từ xa "máy đang chạy bản nào" và
+            để kiểm chứng sau khi bấm CAP-NHAT — bản sau có thể chỉ sửa lỗi
+            ngầm, không đổi gì trên giao diện để mà nhìn ra.
+          */}
+          {version && <span className="ver">v{version}</span>}
         </span>
 
         <nav className="tabs">

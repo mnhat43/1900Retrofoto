@@ -27,6 +27,30 @@ if ([int]$ver -lt 22) {
 }
 Write-Host "  [ok] Node.js $(node -v)"
 
+<#
+  Phien ban phai khop giua package.json va installer.iss.
+
+  Tu khi CAP-NHAT so package.json cua may voi tag tren GitHub de quyet dinh
+  co cap nhat hay khong, quen bump package.json la moi may ngoai quan ket
+  o ban cu VINH VIEN ma khong bao gi - no chi lang le noi "dang dung ban moi
+  nhat". Chan ngay tai khau dong goi.
+#>
+$pkgVersion = (Get-Content (Join-Path $AppDir "package.json") -Raw | ConvertFrom-Json).version
+if (-not $pkgVersion -or $pkgVersion -eq "0.0.0") {
+  Write-Host "  package.json chua co so phien ban that (dang la '$pkgVersion')." -ForegroundColor Red
+  exit 1
+}
+$issPath = Join-Path $PSScriptRoot "installer.iss"
+$issMatch = Select-String -Path $issPath -Pattern '#define AppVersion "([^"]+)"'
+$issVersion = $issMatch.Matches[0].Groups[1].Value
+# installer.iss dung kieu "1.2", package.json dung "1.2.0" -> so 2 so dau
+if ($issVersion -ne ($pkgVersion -replace '^(\d+\.\d+).*', '$1')) {
+  Write-Host "  Lech phien ban: package.json=$pkgVersion nhung installer.iss=$issVersion" -ForegroundColor Red
+  Write-Host "  Sua cho khop roi dong goi lai." -ForegroundColor Red
+  exit 1
+}
+Write-Host "  [ok] Phien ban $pkgVersion"
+
 # --- 2. Build giao dien ---
 Write-Host "  Dang build giao dien..."
 Push-Location $AppDir
@@ -40,7 +64,20 @@ Pop-Location
 Write-Host "  [ok] Da build giao dien"
 
 # --- 3. Don thu muc dich ---
-if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
+<#
+  Xoa NOI DUNG chu khong xoa ca thu muc.
+
+  Chi can mot cua so Explorer hay mot terminal dang dung o $OutDir la Windows
+  khoa CHINH thu muc do (khoa thu muc lam viec, khong phai khoa file) - luc do
+  'Remove-Item $OutDir' that bai va ca lan dong goi hong. File ben trong thi
+  van xoa duoc binh thuong.
+
+  Muc tieu that su la "khong con file thua cua lan truoc", khong phai "thu muc
+  bien mat" - nen lam theo cach khong bao gio vuong khoa nay.
+#>
+if (Test-Path $OutDir) {
+  Get-ChildItem $OutDir -Force | Remove-Item -Recurse -Force
+}
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 
 # --- 4. Chep ma nguon va tai nguyen ---

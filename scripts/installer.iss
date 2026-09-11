@@ -8,7 +8,9 @@
 ; Ket qua: build\1900Retrofoto-Setup.exe - chep sang may khac, nhap dup la cai duoc.
 
 #define AppName "1900 Retrofoto"
-#define AppVersion "1.1"
+; PHAI khop 2 so dau cua "version" trong package.json - package-app.ps1
+; kiem tra va tu choi dong goi neu lech.
+#define AppVersion "1.2"
 #define AppPublisher "1900 Retrofoto"
 
 [Setup]

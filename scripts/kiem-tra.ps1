@@ -60,7 +60,10 @@ for ($i = 1; $i -le 3; $i++) {
 
 if ($health) {
   $up = [TimeSpan]::FromSeconds($health.uptimeSeconds)
-  Add-Check 'OK' ("Server dang chay (da chay {0} gio {1} phut)" -f [int]$up.TotalHours, $up.Minutes)
+  # Kem so phien ban: cau hoi dau tien khi ho tro tu xa luon la "may dang
+  # chay ban nao", va nhan vien chi can doc lai dong nay thay vi di tim.
+  $v = if ($health.version) { " - ban v$($health.version)" } else { "" }
+  Add-Check 'OK' ("Server dang chay (da chay {0} gio {1} phut){2}" -f [int]$up.TotalHours, $up.Minutes, $v)
 } else {
   $procs = @(Get-ServerProcess $AppDir)
   if ($procs.Count -gt 0) {

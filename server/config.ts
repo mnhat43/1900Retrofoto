@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Cấu hình server. Đọc từ biến môi trường, có mặc định hợp lý để chạy thử ngay.
@@ -22,7 +23,30 @@ if (existsSync(envFile)) {
   }
 }
 
+/**
+ * Phiên bản đang chạy, đọc từ package.json.
+ *
+ * Neo vào vị trí file mã nguồn (`../package.json`) chứ không phải
+ * `process.cwd()`: bố cục này giống nhau ở cả kho mã nguồn lẫn gói cài đặt,
+ * còn thư mục làm việc thì đổi theo cách khởi động.
+ *
+ * Số này là thứ `CAP-NHAT` so với bản mới nhất trên GitHub để biết có cần
+ * cập nhật không — đọc hụt thì trả '0.0.0' để luôn coi là có bản mới, thà
+ * cập nhật thừa còn hơn kẹt mãi ở bản cũ mà không ai biết.
+ */
+function readVersion(): string {
+  try {
+    const path = fileURLToPath(new URL('../package.json', import.meta.url));
+    return JSON.parse(readFileSync(path, 'utf8')).version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 export const CONFIG = {
+  /** Phiên bản phần mềm, ví dụ "1.2.0". */
+  version: readVersion(),
+
   port: Number(process.env.PHOTOBOOTH_PORT ?? 8080),
 
   /** Thư mục gốc chứa database và toàn bộ ảnh. */

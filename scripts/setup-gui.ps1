@@ -333,7 +333,11 @@ $btn.Add_Click({
           @('KIEM-TRA (chay khi co van de)', 'KIEM-TRA.bat'),
           @('KHOI-DONG-LAI', 'KHOI-DONG-LAI.bat'),
           @('SUA-IP (khi doi dia chi)', 'SUA-IP.bat'),
-          @('DAT-IP-TINH (ghim dia chi)', 'DAT-IP-TINH.bat')
+          @('DAT-IP-TINH (ghim dia chi)', 'DAT-IP-TINH.bat'),
+          # Tro vao THU MUC CAI DAT -> script hieu la che do tu dong: tu hoi
+          # GitHub, tu tai ban moi ve. Nhan vien khong phai dong toi trinh
+          # duyet hay biet giai nen la gi.
+          @('CAP-NHAT (len ban moi)', 'CAP-NHAT.bat')
         )) {
         $target = Join-Path $AppDir $pair[1]
         if (Test-Path $target) {

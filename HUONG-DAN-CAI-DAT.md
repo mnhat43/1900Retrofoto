@@ -121,7 +121,7 @@ Windows Settings lần nào:
 | Mở firewall cho cả 2 loại mạng | Windows hay xếp WiFi quán là *Public*; chỉ mở *Private* là điện thoại khách bị chặn sạch |
 | Đăng ký tự chạy khi bật máy | Mất điện, bật lại là server tự lên, không cần ai đăng nhập |
 | Đăng ký tự cứu khi server chết | Cứ 5 phút kiểm tra một lần, chết thì tự bật lại |
-| Tạo 5 lối tắt ngoài màn hình | `1900 Retrofoto`, `KIEM-TRA`, `KHOI-DONG-LAI`, `SUA-IP`, `DAT-IP-TINH` |
+| Tạo 6 lối tắt ngoài màn hình | `1900 Retrofoto`, `KIEM-TRA`, `KHOI-DONG-LAI`, `SUA-IP`, `DAT-IP-TINH`, `CAP-NHAT` |
 
 ---
 
@@ -330,21 +330,35 @@ Màn hình đã có dòng nhắc sẵn, nhưng nhân viên nên nói thêm một
 
 ## Cập nhật bản mới
 
-Khi có bản mới:
+**Nhấp đúp lối tắt `CAP-NHAT` ngoài màn hình** → bấm **Yes** → gõ `c` rồi Enter.
 
-1. Vào lại **https://github.com/mnhat43/1900Retrofoto/releases**
-2. Tải file `1900Retrofoto.zip` mới nhất
-3. Chuột phải file → **Extract All…** → **Extract**
-   *(giải nén ngay tại Downloads, **đừng** chép đè lên `C:\1900Retrofoto`)*
-4. Mở thư mục vừa giải nén, **chuột phải `CAP-NHAT.bat`** →
-   **Run as administrator**
-5. Gõ `c` rồi Enter để xác nhận
+Hết. Không phải mở trình duyệt, không phải tải, không phải giải nén.
 
-Xong. Máy tắt server khoảng 1–2 phút rồi tự bật lại, và in ra địa chỉ để
-bạn mở kiểm tra.
+Máy tự hỏi GitHub xem có bản mới không:
+
+- **Đang là bản mới nhất** → nó nói vậy rồi đóng, không đụng gì tới máy
+- **Có bản mới** → nó cho xem *"v1.2.0 → v1.3.0, tải về 44 MB"*; bạn đồng ý
+  thì nó tự tải, tự thay, tự bật lại và in ra địa chỉ để kiểm tra
+
+Mất 2–5 phút tuỳ tốc độ mạng, trong đó server tắt khoảng 1–2 phút.
 
 > **Nhớ bấm `Ctrl + Shift + R`** ở trang quản lý và ở cả 3 máy trong phòng
 > chụp sau khi cập nhật — trình duyệt hay giữ lại giao diện cũ.
+
+**Muốn biết máy đang chạy bản nào?** Xem góc trên bên trái trang quản lý,
+ngay cạnh chữ *1900 Retrofoto*. Hoặc nhấp đúp `KIEM-TRA` — dòng đầu có ghi.
+
+### Nếu máy quán không vào được Internet
+
+1. Dùng máy khác vào **https://github.com/mnhat43/1900Retrofoto/releases**
+2. Tải `1900Retrofoto.zip`, chép sang máy quán bằng USB
+3. Chuột phải file → **Extract All…** → **Extract**
+   *(giải nén ra thư mục riêng, **đừng** chép đè lên `C:\1900Retrofoto`)*
+4. Mở thư mục vừa giải nén, **chuột phải `CAP-NHAT.bat`** →
+   **Run as administrator** → gõ `c`
+
+`CAP-NHAT` tự nhận ra đang ở kiểu nào: chạy từ lối tắt thì nó đi tải,
+chạy từ thư mục vừa giải nén thì nó dùng luôn bản có sẵn ở đó.
 
 **Cập nhật lúc nào:** khi không có khách nào đang chụp. Khách đang ghép ảnh
 bằng điện thoại thì vẫn an toàn — làm lại được sau khi server bật lại.

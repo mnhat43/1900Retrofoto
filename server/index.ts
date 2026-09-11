@@ -120,6 +120,8 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     const d = diskInfo();
     json(res, 200, {
       ok: true,
+      // CAP-NHAT va KIEM-TRA doc so nay de biet may dang chay ban nao
+      version: CONFIG.version,
       uptimeSeconds: Math.round(process.uptime()),
       host: process.env.PHOTOBOOTH_HOST ?? `${lanAddress()}:${CONFIG.port}`,
       port: CONFIG.port,
