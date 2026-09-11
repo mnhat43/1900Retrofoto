@@ -117,84 +117,20 @@ describe('tải lên định dạng khác PNG', () => {
     expect(readFrameImage(f.id)!.equals(png3)).toBe(true);
   });
 
-  it('KHÔNG lưu khung không có ô nào', async () => {
-    // Ảnh đặc + không vẽ ô = khung che kín ảnh khách. Phải chặn ở khâu lưu.
+  it('từ chối JPG với lời giải thích, không lưu gì', async () => {
     const jpg = await sharp(png3).flatten({ background: '#fff' }).jpeg().toBuffer();
-    await expect(createFrame({ label: 'Quen ve o', png: jpg })).rejects.toThrow(/ô nào/);
+    await expect(createFrame({ label: 'Tu JPG', png: jpg })).rejects.toThrow(/JPG/);
     expect(listFrames().length).toBe(0);
-  });
-});
-
-describe('khoét lỗ cho khung đặc', () => {
-  /** Đếm tỉ lệ pixel trong suốt của một file PNG. */
-  async function tiLeTrong(buf: Buffer): Promise<number> {
-    const { data, info } = await sharp(buf).ensureAlpha().raw()
-      .toBuffer({ resolveWithObject: true });
-    let trong = 0;
-    for (let i = 3; i < data.length; i += info.channels) if (data[i] < 128) trong++;
-    return trong / (info.width * info.height);
-  }
-
-  const jpgDac = async () => sharp({
-    create: { width: 600, height: 1800, channels: 3, background: { r: 30, g: 30, b: 30 } },
-  }).jpeg().toBuffer();
-
-  it('khoét đúng các ô nhân viên đặt', async () => {
-    const f = await createFrame({
-      label: 'JPG tu dat o',
-      png: await jpgDac(),
-      slots: [
-        { x: 0.1, y: 0.05, w: 0.8, h: 0.28 },
-        { x: 0.1, y: 0.36, w: 0.8, h: 0.28 },
-        { x: 0.1, y: 0.67, w: 0.8, h: 0.28 },
-      ],
-    });
-
-    const saved = readFrameImage(f.id)!;
-    expect((await sharp(saved).metadata()).hasAlpha).toBe(true);
-    expect(f.slotCount).toBe(3);
-    // 3 ô × 0.8 × 0.28 = 67.2% diện tích
-    expect(await tiLeTrong(saved)).toBeCloseTo(0.672, 2);
   });
 
   /*
-   * Phép thử quan trọng nhất của cả tính năng: khung được đè LÊN TRÊN ảnh
-   * khách lúc render, nên nếu khoét hỏng thì khách nhận về tấm ảnh che kín mà
-   * không có lỗi nào báo ra.
+   * Xoá hết ô rồi mới bấm lưu: analyzeFrame không chặn được vì nó dò lại từ
+   * file, còn slots truyền vào lại rỗng. Chốt chặn phải nằm trong createFrame.
    */
-  it('ảnh khách hiện được qua lỗ vừa khoét', async () => {
-    const f = await createFrame({
-      label: 'Kiem tra hien anh',
-      png: await jpgDac(),
-      slots: [{ x: 0.2, y: 0.2, w: 0.6, h: 0.6 }],
-    });
-
-    const khung = readFrameImage(f.id)!;
-    const anhKhach = await sharp({
-      create: { width: 600, height: 1800, channels: 4, background: { r: 0, g: 200, b: 255, alpha: 1 } },
-    }).png().toBuffer();
-
-    const ghep = await sharp(anhKhach).composite([{ input: khung }]).png().toBuffer();
-    const { data } = await sharp(ghep).raw().toBuffer({ resolveWithObject: true });
-
-    let thay = 0;
-    for (let i = 0; i < data.length; i += 4) if (data[i + 2] > 200) thay++;
-    expect(thay).toBeGreaterThan(0);
-  });
-
-  it('KHÔNG khoét khung vốn đã có vùng trong suốt', async () => {
-    // Khung PNG thật: giữ nguyên file, không đụng vào lỗ sẵn có
-    const f = await createFrame({ label: 'PNG san co', png: png3 });
-    expect(readFrameImage(f.id)!.equals(png3)).toBe(true);
-  });
-
-  it('ô tràn ra ngoài mép ảnh vẫn khoét được, không lỗi', async () => {
-    const f = await createFrame({
-      label: 'O tran mep',
-      png: await jpgDac(),
-      slots: [{ x: 0.8, y: 0.8, w: 0.5, h: 0.5 }],
-    });
-    expect(await tiLeTrong(readFrameImage(f.id)!)).toBeGreaterThan(0);
+  it('KHÔNG lưu khung không có ô nào', async () => {
+    await expect(createFrame({ label: 'Xoa het o', png: png3, slots: [] }))
+      .rejects.toThrow(/ô nào/);
+    expect(listFrames().length).toBe(0);
   });
 });
 

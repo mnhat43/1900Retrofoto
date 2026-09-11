@@ -80,61 +80,35 @@ check('dò thử: đúng 9 ô', r.body?.slots?.length === 9, `${r.body?.slots?.l
 check('dò thử: đoán đúng khổ 6×6', r.body?.formatId === 'square66', r.body?.formatId);
 
 /*
- * Ảnh đặc (JPG, hay PNG xuất kèm nền) KHÔNG còn bị từ chối: dò ra 0 ô, nhân
- * viên tự đặt ô, rồi khâu lưu khoét lỗ theo. Kiểm cả ba nhịp đó qua HTTP thật.
+ * Ảnh đặc phải bị từ chối NGAY Ở KHÂU DÒ, kèm lời nhắn hiểu được.
+ *
+ * Từng có một bản cho nhận rồi tự khoét lỗ theo ô nhân viên vẽ. Nhưng lỗ khoét
+ * chỉ ra được hình chữ nhật vuông góc, nên ô lệch một chút là ăn mất viền
+ * khung mà nhân viên không thấy trước. Giờ chặn thẳng và bảo đi xuất lại file.
  */
 const solid = await sharp({
   create: { width: 600, height: 1800, channels: 3, background: { r: 9, g: 9, b: 9 } },
-}).jpeg().toBuffer();
-
+}).png().toBuffer();
 r = await api('/api/staff/frames/analyze', {
-  method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: solid,
+  method: 'POST', headers: { 'content-type': 'image/png' }, body: solid,
 });
-check('ảnh đặc: nhận file, dò ra 0 ô', r.status === 200 && r.body?.slots?.length === 0,
-  `${r.status} / ${r.body?.slots?.length} ô`);
-check('ảnh đặc: đánh dấu duc để giao diện nhắc đúng việc', r.body?.duc === true, `${r.body?.duc}`);
-check('ảnh đặc: vẫn trả kích thước thật cho màn nắn ô',
-  r.body?.width === 600 && r.body?.height === 1800, `${r.body?.width}x${r.body?.height}`);
+check('từ chối ảnh không có nền trong suốt', r.status === 400, `nhận ${r.status}`);
+check('báo lỗi nói rõ vì sao', /trong suốt/.test(r.body?.error ?? ''), r.body?.error);
 
-// Không ô nào thì khung che kín ảnh khách - khâu lưu phải chặn
-r = await api(`/api/staff/frames?label=${encodeURIComponent('Quen ve o')}`, {
-  method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: solid,
+const jpgDac = await sharp(solid).jpeg().toBuffer();
+r = await api('/api/staff/frames/analyze', {
+  method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: jpgDac,
 });
-check('ảnh đặc: KHÔNG lưu khi chưa vẽ ô nào', r.status === 400, `nhận ${r.status}`);
-check('ảnh đặc: lời nhắn bảo đi vẽ ô', /ô nào/.test(r.body?.error ?? ''), r.body?.error);
+check('JPG: nói thẳng là không dùng làm khung được',
+  r.status === 400 && /JPG/.test(r.body?.error ?? ''), r.body?.error);
 
-/*
- * Có ô -> lưu được. Và phải kiểm LỖ CÓ THẬT SỰ ĐƯỢC KHOÉT trên file phục vụ
- * ra: khung đè lên trên ảnh khách lúc render, nên khoét hỏng là khách nhận
- * tấm che kín mà không có lỗi nào báo ra.
- */
-const oTuDat = [{ x: 0.1, y: 0.05, w: 0.8, h: 0.4 }, { x: 0.1, y: 0.5, w: 0.8, h: 0.4 }];
-r = await api(`/api/staff/frames?label=${encodeURIComponent('Khung JPG tu dat o')}`
-  + `&slots=${encodeURIComponent(encodeURIComponent(JSON.stringify(oTuDat)))}`, {
-  method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: solid,
+// Xoa het o roi moi bam luu: phai bao loi, KHONG duoc am tham luu o do tu dong
+r = await api(`/api/staff/frames?label=${encodeURIComponent('Xoa het o')}`
+  + `&slots=${encodeURIComponent(encodeURIComponent('[]'))}`, {
+  method: 'POST', headers: { 'content-type': 'image/png' }, body: PNG('basic-6'),
 });
-check('ảnh đặc: lưu được khi đã đặt ô', r.status === 200 && r.body?.frame?.slotCount === 2,
-  `${r.status} / ${r.body?.frame?.slotCount} ô`);
-
-if (r.body?.frame) {
-  const ducFrame = r.body.frame;
-  const kBuf = Buffer.from(await (await fetch(BASE + ducFrame.overlaySrc)).arrayBuffer());
-  check('ảnh đặc: file lưu ra có kênh alpha',
-    (await sharp(kBuf).metadata()).hasAlpha === true);
-
-  const { data: kPix, info: kInfo } = await sharp(kBuf).ensureAlpha().raw()
-    .toBuffer({ resolveWithObject: true });
-  let trong = 0;
-  for (let i = 3; i < kPix.length; i += kInfo.channels) if (kPix[i] < 128) trong++;
-  const tiLe = trong / (kInfo.width * kInfo.height);
-  // 2 ô x 0.8 x 0.4 = 64% diện tích
-  check('ảnh đặc: khoét đúng hai ô đã đặt', Math.abs(tiLe - 0.64) < 0.02,
-    `trong suốt ${(tiLe * 100).toFixed(1)}%`);
-
-  // Dọn đi: các phép đếm khung phía dưới tính theo 6 mẫu + 1 khung của quán
-  await api(`/api/staff/frames/${ducFrame.id}`, { method: 'DELETE' });
-}
-
+check('xoá hết ô thì KHÔNG lưu, và không âm thầm dùng ô dò được',
+  r.status === 400 && /ô nào/.test(r.body?.error ?? ''), `${r.status} ${r.body?.error}`);
 r = await api(`/api/staff/frames?label=${encodeURIComponent('Khung Của Quán')}`, {
   method: 'POST', headers: { 'content-type': 'image/png' }, body: PNG('basic-6'),
 });
@@ -341,14 +315,12 @@ check('nắn ô: bấm Huỷ thì không lưu gì',
   (await sp.locator('.frame-preview').count()) === 0);
 
 /*
- * ẢNH ĐẶC TRÊN GIAO DIỆN.
+ * HUONG DAN VA BO CUC THE TAI KHUNG.
  *
- * Với ảnh đặc, ô không phải cái khung ngắm mà là VẾT CẮT: lưu xong là hoa văn
- * trong lòng ô mất thật. Nên màn này phải vẽ ô thành lỗ caro, và phải có nút
- * chừa viền — đó là hai thứ cho nhân viên thấy trước hậu quả, thay vì phát
- * hiện sau khi khách đã nhận ảnh.
+ * Khung bat buoc phai co nen trong suot, nen hai thu phai co mat: loi nhan noi
+ * ro dieu do ngay tren giao dien, va thanh nut Luu/Huy nam dung cho.
  */
-console.log('\n--- Ảnh đặc trên giao diện ---');
+console.log('\n--- Huong dan va bo cuc ---');
 
 check('có khối hướng dẫn chuẩn bị file khung',
   (await sp.locator('.frame-help summary').count()) === 1);
@@ -357,72 +329,58 @@ await sp.waitForTimeout(200);
 const hd = (await sp.locator('.frame-help').textContent()) ?? '';
 check('hướng dẫn nói rõ trong suốt khác màu trắng',
   /trống rỗng/.test(hd) && /màu trắng/.test(hd));
+check('hướng dẫn nói thẳng là KHÔNG nhận JPG', /[Kk]hông nhận JPG/.test(hd));
 check('hướng dẫn có cách xuất file và kích thước cần xuất',
   /Canva/.test(hd) && /600 × 1800/.test(hd));
+check('hướng dẫn KHÔNG còn nhắc tới ảnh đặc tự đặt ô',
+  !/tự vẽ ô|khoét thủng|xếp nhanh/.test(hd));
 await sp.click('.frame-help summary');
+await sp.waitForTimeout(150);
 
-const jpgDir = mkdtempSync(join(tmpdir(), 'pb-vfj-'));
-const jpgKhung = join(jpgDir, 'khung-dac.jpg');
-writeFileSync(jpgKhung, await sharp({
-  create: { width: 600, height: 1800, channels: 3, background: { r: 36, g: 31, b: 43 } },
-}).jpeg().toBuffer());
+// Hop chon file khong duoc moi JPG vao: chon roi nhan loi la to cong
+check('hộp chọn file KHÔNG mời JPG vào',
+  !/jpe?g/i.test(await sp.getAttribute('input[type=file]', 'accept') ?? ''),
+  await sp.getAttribute('input[type=file]', 'accept'));
 
-await sp.setInputFiles('input[type=file]', jpgKhung);
+// Thanh nan o chi con Hoan tac
+await sp.setInputFiles('input[type=file]', 'public/frames/basic-6.png');
 await sp.waitForSelector('.frame-preview', { timeout: 15000 });
 await sp.waitForTimeout(300);
+check('đã bỏ nút xếp nhanh và chừa viền',
+  (await sp.locator('.slot-editor .se-chip').count()) === 0);
+check('vẫn còn nút Hoàn tác',
+  (await sp.locator('.se-head button:has-text("Hoàn tác")').count()) === 1);
 
-check('ảnh đặc: vẽ ô thành lỗ caro (class se-duc)',
-  (await sp.locator('.se-box.se-duc').count()) === 1);
-check('ảnh đặc: vào màn với 0 ô và nút Lưu bị khoá',
-  (await sp.locator('.slot-box').count()) === 0
-  && await sp.isDisabled('.preview-actions button.primary'));
-
-await sp.click('.se-tools .se-chip:has-text("3")');
-await sp.waitForTimeout(200);
-check('ảnh đặc: xếp nhanh ra 3 ô và mở lại nút Lưu',
-  (await sp.locator('.slot-box').count()) === 3
-  && !(await sp.isDisabled('.preview-actions button.primary')));
-
-const dienTich = () => sp.evaluate(() => [...document.querySelectorAll('.slot-box')]
-  .reduce((t, e) => {
-    const r = e.getBoundingClientRect();
-    return t + r.width * r.height;
-  }, 0));
-
-const dt0 = await dienTich();
-await sp.click('.se-tools .se-chip[title^="Thu nhỏ"]');
-await sp.waitForTimeout(150);
-const dt1 = await dienTich();
-check('chừa viền: bấm co thì mọi ô nhỏ lại',
-  dt1 < dt0, `${Math.round(dt0)} -> ${Math.round(dt1)}`);
-
-await sp.click('.se-tools .se-chip[title^="Nới"]');
-await sp.waitForTimeout(150);
-check('chừa viền: bấm nới thì về đúng cỡ cũ',
-  Math.abs((await dienTich()) - dt0) < dt0 * 0.02);
-
-// Nới quá tay: ô phải dừng ở mép ảnh, không tràn ra ngoài
-for (let i = 0; i < 12; i++) await sp.click('.se-tools .se-chip[title^="Nới"]');
-await sp.waitForTimeout(250);
-const tran = await sp.evaluate(() => {
-  const b = document.querySelector('.preview-img img').getBoundingClientRect();
-  return [...document.querySelectorAll('.slot-box')].some((e) => {
-    const r = e.getBoundingClientRect();
-    return r.left < b.left - 1 || r.right > b.right + 1
-      || r.top < b.top - 1 || r.bottom > b.bottom + 1;
-  });
+/*
+ * Thanh hanh dong phai TRAI NGANG ca the va nam duoi cung.
+ *
+ * Truoc day nut nam trong cot phai voi margin-top:auto, nen anh dai doc cao
+ * bao nhieu thi nut bi day xuong va lung lo giua khoang trang bay nhieu.
+ */
+const bo = await sp.evaluate(() => {
+  const the = document.querySelector('.frame-preview').getBoundingClientRect();
+  const tt = document.querySelector('.preview-info').getBoundingClientRect();
+  const th = document.querySelector('.preview-actions').getBoundingClientRect();
+  const anh = document.querySelector('.preview-img').getBoundingClientRect();
+  return {
+    trongCotPhai: document.querySelector('.preview-info .preview-actions') !== null,
+    rongGanBangThe: th.width / the.width,
+    duoiCaAnhVaChu: th.top >= anh.bottom - 1 && th.top >= tt.bottom - 1,
+    hoLonDuoiChu: th.top - tt.bottom,
+  };
 });
-check('chừa viền: nới quá tay ô KHÔNG tràn ra ngoài ảnh', tran === false);
+check('thanh nút KHÔNG còn nằm trong cột phải', bo.trongCotPhai === false);
+check('thanh nút trải ngang cả thẻ', bo.rongGanBangThe > 0.85,
+  `${(bo.rongGanBangThe * 100).toFixed(0)}% bề ngang thẻ`);
+check('thanh nút nằm dưới cả ảnh và cột chữ', bo.duoiCaAnhVaChu);
 
-await sp.click('.preview-actions .ghost');
-await sp.waitForTimeout(300);
+const nut = await sp.evaluate(() => {
+  const b = [...document.querySelectorAll('.preview-actions button')];
+  return b.map((e) => e.textContent.trim());
+});
+check('thứ tự nút: Huỷ rồi Lưu khung',
+  nut[0] === 'Huỷ' && nut[1] === 'Lưu khung', nut.join(' | '));
 
-// Khung đã có lỗ sẵn thì KHÔNG vẽ caro: ở đó ô là khung ngắm, không phải vết cắt
-await sp.setInputFiles('input[type=file]', 'public/frames/basic-4.png');
-await sp.waitForSelector('.frame-preview', { timeout: 15000 });
-await sp.waitForTimeout(300);
-check('khung có lỗ sẵn: KHÔNG vẽ ô thành caro',
-  (await sp.locator('.se-box.se-duc').count()) === 0);
 await sp.click('.preview-actions .ghost');
 await sp.waitForTimeout(300);
 

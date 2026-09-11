@@ -675,7 +675,12 @@ button.primary.danger:hover:not(:disabled) { background: var(--danger); filter: 
   background: var(--surface);
   padding: 0 14px;
   font-size: 13px;
-  max-height: 42vh;
+  /*
+   * Trần cao để khối này không chiếm hết chỗ của thư viện khung, nhưng phải
+   * đủ cho hết nội dung: cắt mất dòng cuối thì nhân viên không biết là còn,
+   * vì khối gập/mở trông như đã hiện đủ.
+   */
+  max-height: 60vh;
   overflow-y: auto;
 }
 
@@ -717,7 +722,70 @@ button.primary.danger:hover:not(:disabled) { background: var(--danger); filter: 
 
 .frame-help b { color: var(--text-1); }
 
-.frame-help > :last-child { margin-bottom: 12px; }
+.frame-help-body { padding-bottom: 12px; }
+
+/* Câu chốt đặt trên cùng, đậm hơn phần còn lại vì nó là điều kiện bắt buộc */
+.frame-help-lead {
+  font-size: 13.5px;
+  color: var(--text-1) !important;
+  margin-bottom: 6px !important;
+}
+
+.frame-help-lead2 { margin-bottom: 12px !important; }
+
+/*
+ * Hai cột: "nhận file thế nào" và "xuất file cho đúng".
+ *
+ * Xếp một cột thì khối này dài hơn 500px và đẩy thư viện khung xuống mất; mà
+ * đây là thứ đọc một lần rồi thôi, không đáng chiếm chỗ đó. Màn hẹp thì tự
+ * rơi về một cột.
+ */
+/*
+ * BA CỘT cho ba chủ đề rời nhau: nhận file gì, xuất thế nào, xuất cỡ nào.
+ *
+ * Số cột đặt thẳng thay vì auto-fit: chỉ có đúng ba section, mà auto-fit thì
+ * đếm theo bề ngang nên còn dựng thêm track rỗng rồi mới gập lại.
+ *
+ * Chia ba là để KHỐI THẤP XUỐNG, không phải cho đẹp: xếp hai cột thì ở màn
+ * 1024x700 khối cao 479px mà trần chỉ 404px, nên dòng "cách kiểm nhanh" ở
+ * cuối bị cắt mất — mà khối gập/mở trông như đã hiện đủ nên không ai biết là
+ * còn nội dung bên dưới.
+ */
+.frame-help-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 24px;
+  align-items: start;
+}
+
+/*
+ * Ngưỡng 940px chứ không phải 1100px: màn thấp nhất còn dùng thật là
+ * 1024x700, và chính ở đó khối mới dễ bị cắt nhất (trần tính theo vh). Ba cột
+ * ở 1024 cho mỗi cột ~310px — vẫn đủ rộng cho một dòng bullet.
+ */
+@media (max-width: 940px) {
+  .frame-help-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .frame-help-cols { grid-template-columns: 1fr; }
+}
+
+.frame-help-cols h4:first-child { margin-top: 0; }
+
+/* Dòng "không nhận JPG" — cảnh báo nên phải bật ra khỏi khối chữ xám */
+.frame-help-no {
+  border-left: 3px solid var(--danger);
+  padding-left: 10px;
+}
+
+/* Cách kiểm nhanh: chốt hạ, nằm tách dưới hai cột */
+.frame-help-kiem {
+  margin-top: 12px !important;
+  margin-bottom: 0 !important;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
 
 .frame-list {
   flex: 1 1 0;
@@ -869,6 +937,17 @@ button.link.danger { color: var(--danger); }
 
 .slot-editor .field-label { margin: 0; }
 
+/* Nhãn bên trái, Hoàn tác dạt phải trên cùng một hàng */
+.se-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.se-head > .link { font-size: 12px; }
+
 .se-box {
   cursor: crosshair;
   /* Chặn trình duyệt tự kéo-thả ảnh và bôi đen khi đang nắn ô */
@@ -936,86 +1015,6 @@ button.link.danger { color: var(--danger); }
 }
 
 .se-hint { margin: 0; }
-
-/*
- * Thanh xếp nhanh. Con số phải to đủ bấm trúng bằng chuột cùi ở quán, nên
- * dùng ô vuông 28px chứ không phải chữ trần.
- */
-.se-tools {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-/*
- * Hoàn tác đẩy sang phải khi còn chỗ, nhưng KHÔNG được là thứ duy nhất trên
- * một dòng mới: cột khung dải dọc rất hẹp, margin-left:auto đơn thuần làm nó
- * rơi xuống dòng riêng và lửng lơ giữa khoảng trắng.
- */
-.se-tools > .link {
-  margin-left: auto;
-  font-size: 12px;
-}
-
-.se-chip {
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--text-1);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.se-chip:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.se-chip:disabled {
-  opacity: 0.4;
-  cursor: default;
-  border-color: var(--border);
-  color: var(--text-2);
-}
-
-/* Vạch ngăn hai nhóm nút trên thanh công cụ */
-.se-chia {
-  width: 1px;
-  height: 18px;
-  background: var(--border);
-  margin-inline: 2px;
-}
-
-/*
- * ẢNH ĐẶC: vẽ ô thành LỖ CARO chứ không phải khung ngắm.
- *
- * Ô caro là quy ước chung cho "chỗ này trong suốt" (Photoshop, Figma, và cả
- * ảnh khung trong thư viện ngay phía dưới đều vẽ vậy), nên không cần giải
- * thích thêm. Cái được thật sự là nó CHE ĐÚNG phần hoa văn sắp bị khoét mất:
- * kéo ô chờm lên viền là thấy viền biến mất ngay, thay vì phát hiện sau khi
- * đã lưu và khách đã nhận ảnh.
- *
- * Dùng lại đúng hoa văn caro của .preview-img và ảnh khung, để hai chỗ nói
- * cùng một thứ tiếng.
- */
-.se-box.se-duc .slot-box {
-  background:
-    repeating-conic-gradient(#b9b3c4 0 25%, #8f8899 0 50%)
-    0 0 / 12px 12px;
-  border-style: solid;
-}
-
-.se-box.se-duc .slot-box.on {
-  background:
-    repeating-conic-gradient(#c8c2d2 0 25%, #9d95a8 0 50%)
-    0 0 / 12px 12px;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
-}
 
 /*
  * Lời nhắc khi chưa có ô nào, đặt ĐÈ LÊN ảnh.
@@ -1089,13 +1088,26 @@ button.link.danger { color: var(--danger); }
   font-size: 14px;
 }
 
-/* Nút vừa nội dung — kéo dài hết cột phải trông như thanh công cụ, không như nút */
+/*
+ * Thanh hành động TRẢI NGANG CẢ HAI CỘT của thẻ.
+ *
+ * Trước đây nút nằm trong cột phải với margin-top:auto để dạt xuống đáy cột.
+ * Nhưng cột ảnh cao hơn cột chữ rất nhiều (khung dải dọc cao gấp ba bề rộng),
+ * nên nút bị đẩy xuống tận đáy và lửng lơ giữa một khoảng trắng 250px, cách
+ * xa cái ô Tên khung mà nó xác nhận.
+ *
+ * Trải ngang thì nút luôn ở đúng một chỗ bất kể ảnh cao bao nhiêu, và đường
+ * kẻ trên tách bạch "phần xem và sửa" với "phần quyết định".
+ */
 .preview-actions {
+  grid-column: 1 / -1;
   display: flex;
-  gap: 8px;
-  /* auto: đẩy xuống đáy cột, nhưng vẫn cách phần chữ ở trên khi cột ngắn */
-  margin-top: auto;
-  padding-top: 16px;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
 .preview-actions .primary { flex: 0 0 auto; min-width: 150px; }
@@ -1104,7 +1116,7 @@ button.link.danger { color: var(--danger); }
 @media (max-width: 760px) {
   .frame-preview { width: auto; grid-template-columns: 1fr; }
   .preview-img img { max-width: min(260px, 60vw); }
-  .preview-actions { padding-top: 14px; }
+  .preview-actions { padding-top: 12px; }
 }
 
 /* ---------- Điện thoại: bảng thành thẻ ---------- */

@@ -279,8 +279,6 @@ export type FrameAnalysis = {
   widthInch: number;
   heightInch: number;
   slots: Array<{ x: number; y: number; w: number; h: number }>;
-  /** Ảnh đặc: lúc lưu server sẽ khoét lỗ theo các ô nhân viên đặt. */
-  duc: boolean;
 };
 
 /*

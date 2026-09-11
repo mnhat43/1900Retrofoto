@@ -176,13 +176,15 @@ export default function FramesPanel() {
         </div>
         <div>
           {/*
-            Nhận mọi loại ảnh. Ảnh có sẵn vùng trong suốt thì dò ô tự động;
-            ảnh đặc (JPG...) thì nhân viên tự đặt ô và server khoét lỗ theo.
+            CHỈ các định dạng giữ được vùng trong suốt. KHÔNG có JPG: định
+            dạng đó không lưu được độ trong suốt, mà cả cơ chế khung dựa vào
+            đúng thứ đó để biết lỗ nằm ở đâu. Để JPG lọt vào hộp chọn file chỉ
+            khiến nhân viên chọn rồi nhận lỗi.
           */}
           <input
             ref={fileInput}
             type="file"
-            accept="image/*"
+            accept="image/png,image/webp,image/avif,image/gif"
             hidden
             onChange={(e) => onPick(e.target.files?.[0])}
           />
@@ -202,58 +204,78 @@ export default function FramesPanel() {
       <details className="frame-help">
         <summary>Cách chuẩn bị file khung ảnh</summary>
 
-        <p>
-          Khung ảnh <b>không phải một tấm ảnh kín</b> — nó là tấm <b>có lỗ</b>.
-          Hoa văn, chữ, viền nằm ở ngoài; chỗ để ảnh khách hiện ra phải{' '}
-          <b>trống rỗng</b>. Chỗ hay nhầm nhất:{' '}
-          <b>“trống rỗng” khác với “màu trắng”</b> — trắng vẫn là một màu, vẫn
-          phủ kín.
-        </p>
+        <div className="frame-help-body">
+          {/*
+            Phần mở đầu trải ngang cả khối, không nhét vào cột.
+            Đây là đoạn dài nhất, mà cột chỉ rộng ~310px nên nhét vào cột thì
+            nó xuống dòng sáu lần và đẩy cả khối cao thêm ~60px — đủ để dòng
+            cuối bị cắt mất ở màn 1024x700.
+          */}
+          <p className="frame-help-lead">
+            Khung ảnh <b>không phải một tấm ảnh kín</b> — nó là tấm{' '}
+            <b>có lỗ</b>. Hoa văn, chữ, viền nằm ở ngoài; chỗ để ảnh khách hiện
+            ra phải <b>trống rỗng</b>, tức là <b>nền trong suốt</b>.
+          </p>
+          <p className="frame-help-lead2">
+            Chỗ hay nhầm: <b>“trong suốt” khác “màu trắng”</b> — trắng vẫn là
+            một màu, vẫn phủ kín. Nên đuôi <b>.png</b> cũng chưa chắc đúng: lúc
+            xuất mà quên tắt nền thì bạn được file .png nền trắng bịt kín, và
+            phần mềm sẽ từ chối y như JPG.
+          </p>
 
-        <p>
-          Trong phần mềm thiết kế, vùng trong suốt được vẽ thành <b>ô caro</b>,
-          giống hoa văn sau các khung trong thư viện phía dưới. Thấy ô caro là
-          đúng; thấy màu trắng phẳng là chưa được.
-        </p>
+          <div className="frame-help-cols">
+            <section>
+              <h4>Nhận file gì</h4>
+              <p>
+                <b>PNG, WebP, AVIF, GIF</b> — miễn là file còn giữ vùng trong
+                suốt. Phần mềm tự dò ra các lỗ và đánh số sẵn cho bạn.
+              </p>
+              <p className="frame-help-no">
+                <b>Không nhận JPG.</b> Không phải do phần mềm chặn, mà do định
+                dạng JPG không lưu được vùng trong suốt — file JPG luôn đặc kín
+                nên không có lỗ nào.
+              </p>
+            </section>
 
-        <h4>Xuất file cho đúng</h4>
-        <ul>
-          <li>
-            <b>Canva:</b> Share → Download → PNG → tick{' '}
-            <b>Transparent background</b> (cần Canva Pro)
-          </li>
-          <li><b>Figma:</b> xoá Fill của frame → Export → PNG</li>
-          <li>
-            <b>Photoshop:</b> xoá layer Background → File → Export As → PNG →
-            tick <b>Transparency</b>
-          </li>
-          <li>
-            <b>Illustrator:</b> File → Export As → PNG → Background:{' '}
-            <b>Transparent</b>
-          </li>
-        </ul>
+            <section>
+              <h4>Xuất file cho đúng</h4>
+              <ul>
+                <li>
+                  <b>Canva:</b> Share → Download → PNG → tick{' '}
+                  <b>Transparent background</b> (cần Canva Pro)
+                </li>
+                <li><b>Figma:</b> xoá Fill của frame → Export → PNG</li>
+                <li>
+                  <b>Photoshop:</b> xoá layer Background → File → Export As →
+                  PNG → tick <b>Transparency</b>
+                </li>
+                <li>
+                  <b>Illustrator:</b> File → Export As → PNG → Background:{' '}
+                  <b>Transparent</b>
+                </li>
+              </ul>
+            </section>
 
-        <h4>Kích thước nên xuất (300 DPI)</h4>
-        <ul>
-          <li>Dải dọc 3–4 ô · khổ 2×6 inch → <b>600 × 1800 px</b></li>
-          <li>Tờ 6 ô · khổ 4×6 inch → <b>1200 × 1800 px</b></li>
-          <li>Tờ vuông 9 ô · khổ 6×6 inch → <b>1800 × 1800 px</b></li>
-        </ul>
-        <p className="muted small">
-          Xuất to hơn vẫn tốt. Nhỏ hơn thì in ra rỗ.
-        </p>
+            <section>
+              <h4>Kích thước nên xuất (300 DPI)</h4>
+              <ul>
+                <li>Dải dọc 3–4 ô · khổ 2×6 inch → <b>600 × 1800 px</b></li>
+                <li>Tờ 6 ô · khổ 4×6 inch → <b>1200 × 1800 px</b></li>
+                <li>Tờ vuông 9 ô · khổ 6×6 inch → <b>1800 × 1800 px</b></li>
+              </ul>
+              <p className="muted small">
+                Xuất to hơn vẫn tốt. Nhỏ hơn thì in ra rỗ.
+              </p>
+            </section>
+          </div>
 
-        <h4>Nếu chỉ có ảnh đặc</h4>
-        <p>
-          Vẫn dùng được: bạn tự vẽ ô, phần mềm khoét thủng đúng những ô đó.
-          Nhưng lỗ khoét luôn là <b>hình chữ nhật vuông góc</b>, nên hãy kéo ô{' '}
-          <b>lọt hẳn vào trong lòng viền</b> — chờm lên hoa văn tới đâu là mất
-          hoa văn tới đó. Bấm <b>Chừa viền −</b> để thu nhỏ đều cả loạt ô.
-        </p>
-        <p className="muted small">
-          File <b>.jpg</b> thì luôn là ảnh đặc. Còn đuôi <b>.png</b> mà lúc
-          xuất quên tắt nền thì cũng vẫn đặc — đây là lỗi hay gặp nhất.
-        </p>
+          <p className="frame-help-kiem">
+            <b>Cách kiểm nhanh:</b> mở file trong phần mềm thiết kế, chỗ đặt
+            ảnh khách phải hiện ra <b>ô caro</b> — giống hoa văn phía sau các
+            khung trong thư viện dưới đây. Thấy ô caro là đúng; thấy màu trắng
+            phẳng là chưa được.
+          </p>
+        </div>
       </details>
 
       {error && <p className="error">{error}</p>}
@@ -270,8 +292,6 @@ export default function FramesPanel() {
           <SlotEditor
             src={pending.url}
             slots={pending.analysis.slots}
-            ratio={pending.analysis.width / pending.analysis.height}
-            duc={pending.analysis.duc}
             onChange={(slots) => setPending({
               ...pending,
               analysis: { ...pending.analysis, slots },
@@ -324,48 +344,41 @@ export default function FramesPanel() {
               {Math.round(pending.analysis.widthInch * 300)}×
               {Math.round(pending.analysis.heightInch * 300)}px ở 300 DPI.
             </p>
-            {/*
-              Hai đường vào màn này cần hai lời nhắc khác nhau. Khung đã có lỗ
-              thì việc của nhân viên là ĐỐI CHIẾU ô với lỗ; khung đặc thì ô
-              chính là thứ quyết định lỗ sẽ được khoét ở đâu — nói nhầm một
-              câu là nhân viên làm nhầm việc.
-            */}
-            {pending.analysis.duc ? (
-              <p className="muted small">
-                Ảnh này không có sẵn vùng trong suốt, nên các ô bạn đặt sẽ được
-                khoét thủng để ảnh khách hiện qua. <b>Vùng caro trên ảnh là lỗ
-                sắp khoét</b> — kéo ô lọt hẳn vào trong lòng viền, vì chờm lên
-                hoa văn tới đâu là mất hoa văn tới đó.
-              </p>
-            ) : (
-              <p className="muted small">
-                Kiểm tra các ô đánh số có trùng lỗ trên khung không rồi hãy lưu.
-              </p>
-            )}
+            <p className="muted small">
+              Kiểm tra các ô đánh số có trùng lỗ trên khung không rồi hãy lưu.
+            </p>
 
             {pending.analysis.slots.length === 0 && (
               <p className="warn-box small">
                 Chưa có ô nào — khách sẽ không có chỗ đặt ảnh. Kéo trên ảnh để
-                vẽ ô, hoặc dùng nút xếp nhanh.
+                vẽ lại ô.
               </p>
             )}
 
-            <div className="preview-actions">
-              <button
-                className="primary"
-                disabled={!!busy || !pending.label.trim()
-                  || pending.analysis.slots.length === 0}
-                onClick={onSave}
-              >
-                {busy || 'Lưu khung'}
-              </button>
-              <button className="ghost" disabled={!!busy} onClick={() => {
-                URL.revokeObjectURL(pending.url);
-                setPending(null);
-              }}>
-                Huỷ
-              </button>
-            </div>
+          </div>
+
+          {/*
+            Thanh hành động trải ngang CẢ HAI CỘT, không nhét vào cột phải.
+            Cột ảnh cao hơn cột chữ nhiều (khung dải dọc cao gấp ba bề rộng),
+            nên nút nằm trong cột phải thì bị đẩy xuống đáy cột và lửng lơ
+            giữa một khoảng trắng lớn. Trải ngang thì nút luôn ở đúng một chỗ,
+            và thứ tự đọc thành: xem ảnh -> điền tên -> bấm lưu.
+          */}
+          <div className="preview-actions">
+            <button className="ghost" disabled={!!busy} onClick={() => {
+              URL.revokeObjectURL(pending.url);
+              setPending(null);
+            }}>
+              Huỷ
+            </button>
+            <button
+              className="primary"
+              disabled={!!busy || !pending.label.trim()
+                || pending.analysis.slots.length === 0}
+              onClick={onSave}
+            >
+              {busy || 'Lưu khung'}
+            </button>
           </div>
         </div>
       )}

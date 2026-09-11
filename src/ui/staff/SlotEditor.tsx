@@ -1,24 +1,22 @@
 import { useRef, useState } from 'react';
 
-import {
-  type Rect, BUOC_VIEN, MIN_SIZE, clamp01, coNoi, xepLuoi,
-} from './slots';
+export type Rect = { x: number; y: number; w: number; h: number };
 
 /**
- * Đặt các ô chứa ảnh khách lên khung.
+ * Nắn lại các ô trên khung bằng chuột.
  *
- * Hai đường vào màn này:
- *   - Khung có sẵn vùng trong suốt -> ô đã dò tự động, ở đây chỉ sửa nốt chỗ
- *     lệch (lỗ dính nhau, lỗ trang trí, viền mờ làm lệch mép).
- *   - Khung là ảnh đặc (JPG, hay PNG xuất kèm nền) -> KHÔNG có ô nào, nhân
- *     viên tự đặt. Lúc lưu, server khoét lỗ trong suốt theo đúng các ô này.
+ * Khung bắt buộc phải có sẵn vùng trong suốt, nên vào màn này là ô đã được dò
+ * tự động — việc còn lại chỉ là sửa nốt chỗ lệch: lỗ dính nhau, lỗ trang trí
+ * bị tính thành ô, hay viền mờ làm mép ô lệch ra ngoài.
  *
- * Vì đường thứ hai bắt đầu từ con số không nên màn này phải tự làm được việc
- * đó cho nhanh: có nút xếp lưới sẵn và nút chừa viền, chứ kéo tay từng ô cho
- * đều nhau thì rất cực và không bao giờ thẳng hàng.
- *
- * Phần tính toán ô nằm ở ./slots — ở đây chỉ còn chuyện chuột và cách vẽ.
+ * Toạ độ luôn CHUẨN HOÁ 0..1 — giống hệt thứ server lưu và phần render dùng,
+ * nên kéo trên ảnh xem trước bao nhiêu pixel cũng không quan trọng.
  */
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+/** Ô nhỏ hơn mức này coi như bấm nhầm, không cho tạo. */
+const MIN_SIZE = 0.02;
 
 type Drag =
   | { mode: 'move'; i: number; dx: number; dy: number }
@@ -26,22 +24,11 @@ type Drag =
   | { mode: 'draw'; i: number; x0: number; y0: number };
 
 export default function SlotEditor({
-  src, slots, onChange, ratio = 1, duc = false,
+  src, slots, onChange,
 }: {
   src: string;
   slots: Rect[];
   onChange: (slots: Rect[]) => void;
-  /** Bề rộng / chiều cao của file ảnh — quyết định lưới dựng ra mấy cột. */
-  ratio?: number;
-  /**
-   * Ảnh đặc: lúc lưu server sẽ KHOÉT THỦNG đúng các ô này.
-   *
-   * Đổi cách VẼ ô chứ không chỉ để hiện thêm chữ. Với ảnh đặc, ô không phải
-   * cái khung ngắm mà là vết cắt, nên vẽ nó thành lỗ caro: kéo ô chờm lên
-   * viền là thấy hoa văn biến mất ngay trước mắt. Nét đứt hồng không nói ra
-   * được điều đó, và nhân viên chỉ phát hiện sau khi đã lưu.
-   */
-  duc?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -123,56 +110,14 @@ export default function SlotEditor({
   return (
     <div className="slot-editor">
       {/*
-        Tiêu đề cùng kiểu với các nhãn ở cột thông tin, để hai cột bắt đầu
-        cùng một hàng thay vì ảnh cao hơn nhãn bên cạnh.
+        Nhãn cùng kiểu với các nhãn ở cột thông tin, để hai cột bắt đầu cùng
+        một hàng thay vì ảnh cao hơn nhãn bên cạnh.
+
+        Hoàn tác nằm cùng hàng với nhãn: còn đúng một nút nên để riêng một
+        thanh công cụ thì thừa hẳn một dòng trống giữa nhãn và ảnh.
       */}
-      <span className="field-label">Các ô ảnh · {slots.length} ô</span>
-
-      {/*
-        Thanh xếp nhanh. Đây là thứ cứu đường "khung là ảnh đặc": nhân viên
-        vào màn này với 0 ô, và kéo tay 6 ô cho đều nhau thì vừa lâu vừa không
-        thẳng hàng. Bấm một nút ra lưới đều rồi nắn lại vài ô là xong.
-      */}
-      <div className="se-tools">
-        <span className="muted small">Xếp nhanh</span>
-        {[1, 2, 3, 4, 6, 9].map((n) => (
-          <button
-            key={n}
-            type="button"
-            className="se-chip"
-            onClick={() => apply(xepLuoi(n, ratio))}
-            title={`Xếp ${n} ô đều nhau`}
-          >
-            {n}
-          </button>
-        ))}
-
-        {/*
-          Chừa viền: co/nới đồng loạt. Sau khi xếp lưới thì đây là nút hay
-          dùng nhất — lưới xếp sẵn chừa lề 6%, khung nào viền dày hơn thế thì
-          bấm co vài nhịp là hoa văn hiện lại đủ.
-        */}
-        <span className="se-chia" aria-hidden="true" />
-        <span className="muted small">Chừa viền</span>
-        <button
-          type="button"
-          className="se-chip"
-          disabled={!slots.length}
-          onClick={() => apply(coNoi(slots, -BUOC_VIEN))}
-          title="Thu nhỏ tất cả ô để chừa thêm viền"
-        >
-          −
-        </button>
-        <button
-          type="button"
-          className="se-chip"
-          disabled={!slots.length}
-          onClick={() => apply(coNoi(slots, BUOC_VIEN))}
-          title="Nới rộng tất cả ô"
-        >
-          +
-        </button>
-
+      <div className="se-head">
+        <span className="field-label">Các ô ảnh · {slots.length} ô</span>
         <button
           type="button"
           className="link"
@@ -190,7 +135,7 @@ export default function SlotEditor({
       </div>
 
       <div
-        className={duc ? 'preview-img se-box se-duc' : 'preview-img se-box'}
+        className="preview-img se-box"
         ref={box}
         onPointerDown={onDown}
         onPointerMove={onMove}
@@ -200,14 +145,14 @@ export default function SlotEditor({
         <img className="se-img" src={src} alt="" draggable={false} />
 
         {/*
-          Khung đặc vào đây với 0 ô, và một tấm ảnh trơn không gợi ra rằng
-          phải kéo lên nó. Nói thẳng ra, đặt ngay trên ảnh chứ không nhét
-          xuống dòng chú thích phía dưới.
+          Xoá hết ô thì còn lại tấm ảnh trơn, không gợi ra rằng kéo lên nó là
+          vẽ được ô mới. Nói thẳng ra, đặt ngay trên ảnh chứ không nhét xuống
+          dòng chú thích phía dưới.
         */}
         {slots.length === 0 && (
           <div className="se-empty">
             <b>Chưa có ô nào</b>
-            <span>Kéo trên ảnh để vẽ ô, hoặc bấm một số ở trên để xếp sẵn</span>
+            <span>Kéo trên ảnh để vẽ lại ô</span>
           </div>
         )}
 
@@ -246,9 +191,7 @@ export default function SlotEditor({
 
       <p className="se-hint muted small">
         Kéo ô để di chuyển · kéo góc để đổi cỡ · kéo trên nền để thêm ô.
-        {duc
-          ? ' Vùng caro là lỗ sắp khoét — hoa văn nằm trong đó sẽ mất.'
-          : ' Ô là chỗ ảnh khách hiện ra.'}
+        Ô là chỗ ảnh khách hiện ra.
       </p>
 
       {/*

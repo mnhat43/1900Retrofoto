@@ -102,14 +102,17 @@ function readingOrder(slots: DetectedSlot[]): DetectedSlot[] {
 /**
  * Đọc file khung và trả về các ô dò được.
  *
- * Nhận MỌI định dạng ảnh sharp đọc được, kể cả JPG đặc.
+ * Nhận mọi định dạng sharp đọc được MIỄN LÀ có kênh alpha (PNG, WebP, AVIF,
+ * GIF, và cả TIFF nén LZW). Điều kiện thật sự là độ trong suốt chứ không phải
+ * đuôi file: cả cơ chế khung dựa vào việc đọc alpha để biết lỗ nằm ở đâu.
  *
- * Có alpha thì dò sẵn các lỗ để nhân viên khỏi vẽ lại. Không có alpha (JPG,
- * hoặc PNG xuất kèm nền) thì KHÔNG phải lỗi — trả về 0 ô, nhân viên tự vẽ ô
- * trên màn nắn, và khâu lưu sẽ khoét lỗ theo đúng những ô đó.
+ * Hộp chọn file chỉ gợi ý bốn loại đầu. TIFF tuỳ tuỳ chọn nén mà còn hay mất
+ * alpha, nên không hứa trước — file nào còn thì vẫn nhận.
  *
- * Trước đây chỗ này chặn file không alpha. Chặn vậy là nhầm việc: dò tự động
- * chỉ là bước tiện tay đoán hộ, không phải điều kiện để dùng được file.
+ * Ném lỗi nếu file không có kênh alpha. Từng có một bản cho nhận cả ảnh đặc
+ * rồi tự khoét lỗ theo ô nhân viên vẽ, nhưng lỗ khoét chỉ ra được hình chữ
+ * nhật vuông góc: ô lệch một chút là ăn mất viền khung, mà nhân viên không
+ * thấy trước. Thà chặn ngay ở đây và nói rõ phải xuất lại file.
  */
 export async function detectSlots(png: Buffer): Promise<DetectResult> {
   const img = sharp(png);
@@ -119,13 +122,24 @@ export async function detectSlots(png: Buffer): Promise<DetectResult> {
     meta = await img.metadata();
   } catch {
     // sharp không nhận ra định dạng: file hỏng, hoặc không phải ảnh
-    throw new Error('Không đọc được file này. Hãy chọn một file ảnh.');
+    throw new Error('Không đọc được file này. Hãy chọn ảnh PNG, WebP, AVIF hoặc GIF.');
   }
 
-  // Ảnh đặc: không có lỗ nào để dò, nhưng vẫn cần biết kích thước để màn nắn
-  // ô dựng đúng tỉ lệ. Trả về 0 ô chứ không ném lỗi.
   if (!meta.hasAlpha) {
-    return { width: meta.width ?? 0, height: meta.height ?? 0, slots: [] };
+    const loai = (meta.format ?? '').toUpperCase();
+    // JPEG là nhầm lẫn hay gặp nhất, và không có đường sửa bằng cách đổi
+    // tuỳ chọn xuất file - nói rõ để khỏi thử lại vô ích.
+    if (loai === 'JPEG' || loai === 'JPG') {
+      throw new Error(
+        'File JPG không lưu được vùng trong suốt nên không dùng làm khung được. '
+        + 'Xuất lại khung thành PNG (nền trong suốt) rồi tải lên.',
+      );
+    }
+    throw new Error(
+      'File khung phải có nền trong suốt (vùng để lộ ảnh khách).'
+      + `${loai ? ` File này là ${loai} đặc.` : ''}`
+      + ' Xuất lại thành PNG và bật nền trong suốt rồi tải lên.',
+    );
   }
 
   const { data, info } = await img

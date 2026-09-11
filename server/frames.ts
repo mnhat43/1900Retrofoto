@@ -220,20 +220,19 @@ export function readFrameImage(id: string): Buffer | null {
  * Có bước này thì nhân viên xem trước được kết quả dò rồi mới quyết định —
  * lưu thẳng rồi mới phát hiện dò sai thì khách đã kịp thấy khung hỏng.
  *
- * KHÔNG ném lỗi khi dò ra 0 ô. Ảnh đặc (JPG, hay PNG xuất kèm nền) thì đó là
- * chuyện đương nhiên, và nhân viên sẽ tự vẽ ô ở màn nắn. Chặn ở đây là chặn
- * nhầm chỗ — khâu lưu mới là nơi biết cuối cùng có ô nào hay không.
+ * File có alpha mà dò ra 0 ô thì vẫn là lỗi: nghĩa là vùng trong suốt không
+ * thành lỗ nào đủ lớn để đặt ảnh, nên khung đó dùng không được.
  */
 export async function analyzeFrame(png: Buffer): Promise<{
   width: number; height: number; formatId: string;
   widthInch: number; heightInch: number;
   slots: DetectedSlot[];
-  /** Ảnh đặc -> lúc lưu sẽ khoét lỗ theo ô. Giao diện cần biết để nhắc đúng. */
-  duc: boolean;
 }> {
   const r = await detectSlots(png);
+  if (r.slots.length === 0) {
+    throw new FrameError('Không tìm thấy ô trống nào trong file khung');
+  }
   const size = guessSize(r.width, r.height);
-  const duc = !(await sharp(png).metadata()).hasAlpha;
   return {
     width: r.width,
     height: r.height,
@@ -241,54 +240,7 @@ export async function analyzeFrame(png: Buffer): Promise<{
     widthInch: size.widthInch,
     heightInch: size.heightInch,
     slots: r.slots,
-    duc,
   };
-}
-
-/**
- * Khoét lỗ trong suốt trên ảnh khung theo đúng các ô nhân viên đã vẽ.
- *
- * Cần cho ảnh đặc (JPG, hoặc PNG xuất kèm nền): khung được đè LÊN TRÊN ảnh
- * khách lúc render, nên chỗ nào khung đặc là chỗ đó che mất ảnh. Không khoét
- * thì khách nhận về một tấm che kín, dù ô đã vẽ đúng vị trí.
- *
- * Cách làm: đọc ảnh ra RGB thô rồi tự ghép thành RGBA, đặt alpha = 0 trong
- * lòng mỗi ô và 255 ở phần còn lại.
- *
- * KHÔNG dùng sharp.joinChannel: nó nối kênh thứ tư nhưng không đánh dấu đó là
- * alpha, nên ảnh ra vẫn 3 kênh và lỗ khoét biến mất không báo lỗi gì. Tự ghép
- * raw thì kết quả kiểm chứng được bằng số pixel trong suốt.
- *
- * Toạ độ ô là chuẩn hoá 0..1 nên nhân thẳng với kích thước ảnh thật, không
- * phụ thuộc màn nắn ô to nhỏ bao nhiêu.
- */
-async function khoetLo(anh: Buffer, slots: DetectedSlot[]): Promise<Buffer> {
-  const { data, info } = await sharp(anh)
-    .removeAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const { width, height } = info;
-  const rgba = Buffer.alloc(width * height * 4);
-
-  for (let i = 0; i < width * height; i++) {
-    rgba[i * 4] = data[i * 3];
-    rgba[i * 4 + 1] = data[i * 3 + 1];
-    rgba[i * 4 + 2] = data[i * 3 + 2];
-    rgba[i * 4 + 3] = 255;
-  }
-
-  for (const s of slots) {
-    const x0 = Math.max(0, Math.round(s.x * width));
-    const y0 = Math.max(0, Math.round(s.y * height));
-    const x1 = Math.min(width, Math.round((s.x + s.w) * width));
-    const y1 = Math.min(height, Math.round((s.y + s.h) * height));
-    for (let y = y0; y < y1; y++) {
-      for (let x = x0; x < x1; x++) rgba[(y * width + x) * 4 + 3] = 0;
-    }
-  }
-
-  return sharp(rgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
 
 export async function createFrame(opts: {
@@ -305,14 +257,22 @@ export async function createFrame(opts: {
   if (!label) throw new FrameError('Chưa đặt tên khung');
 
   const detected = await analyzeFrame(opts.png);
-  const slots = opts.slots?.length ? opts.slots : detected.slots;
+  /*
+   * Không truyền slots -> dùng ô dò tự động. Truyền MẢNG RỖNG -> đó là ý muốn
+   * rõ ràng "khung này không có ô nào", và phải thành lỗi ở chốt dưới.
+   *
+   * Trước đây chỗ này viết `opts.slots?.length ? opts.slots : detected.slots`,
+   * nên xoá hết ô rồi bấm lưu lại âm thầm lưu ra ô dò tự động — nhân viên
+   * tưởng đã xoá mà khung vẫn y nguyên.
+   */
+  const slots = opts.slots ?? detected.slots;
   const formatId = opts.formatId ?? detected.formatId;
   const widthInch = checkInch(opts.widthInch ?? detected.widthInch, 'chiều rộng');
   const heightInch = checkInch(opts.heightInch ?? detected.heightInch, 'chiều cao');
 
   /*
-   * Không ô nào thì khung vô dụng: khách không có chỗ đặt ảnh. Với ảnh đặc,
-   * dò tự động luôn ra 0 ô nên đây cũng là chốt chặn "quên vẽ ô".
+   * Không ô nào thì khung vô dụng: khách không có chỗ đặt ảnh. analyzeFrame ở
+   * trên đã chặn, nhưng nhân viên có thể xoá hết ô rồi mới bấm lưu.
    */
   if (!slots.length) {
     throw new FrameError(
@@ -327,25 +287,18 @@ export async function createFrame(opts: {
   /*
    * Lưu thành PNG THẬT, không ghi thẳng buffer gốc.
    *
-   * Nhân viên tải lên được mọi định dạng ảnh, nhưng file lưu ra tên .png và
+   * Nhân viên tải lên được cả WebP/AVIF/GIF, nhưng file lưu ra tên .png và
    * mọi nơi phục vụ nó đều khai 'content-type: image/png'. Ghi nguyên buffer
-   * thì thành file JPG/WebP đội lốt PNG — trình duyệt cũ và khâu in sẽ từ
-   * chối, mà triệu chứng chỉ là "khung không hiện" chứ không nói vì sao.
+   * thì thành file WebP đội lốt PNG — trình duyệt cũ và khâu in sẽ từ chối,
+   * mà triệu chứng chỉ là "khung không hiện" chứ không nói vì sao.
    *
    * GIF nhiều khung thì chỉ lấy khung đầu: khung ảnh là hình tĩnh, và
    * detectSlots cũng chỉ đọc khung đầu nên toạ độ ô mới khớp với file lưu ra.
    */
-  const meta = await sharp(opts.png).metadata();
-  let pngData: Buffer;
-
-  if (!meta.hasAlpha) {
-    // Ảnh đặc -> khoét lỗ theo ô nhân viên vẽ, nếu không khung sẽ che kín ảnh
-    pngData = await khoetLo(opts.png, slots);
-  } else if (meta.format === 'png') {
-    pngData = opts.png;
-  } else {
-    pngData = await sharp(opts.png, { animated: false }).png().toBuffer();
-  }
+  const kieuFile = (await sharp(opts.png).metadata()).format;
+  const pngData = kieuFile === 'png'
+    ? opts.png
+    : await sharp(opts.png, { animated: false }).png().toBuffer();
 
   mkdirSync(framesDir(), { recursive: true });
   await writeFile(framePath(filename), pngData);
