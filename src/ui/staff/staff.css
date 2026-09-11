@@ -1161,6 +1161,66 @@ button.link.danger { color: var(--danger); }
 
 .composing button.link { padding: 2px 8px; min-height: 26px; font-size: 12px; }
 
+/* Nhóm nút của dòng "đang ghép ảnh" — dồn về mép phải thành một cụm */
+.composing-acts { display: flex; align-items: center; gap: 2px; flex: none; }
+
+/* =========================================================================
+   Hiện lại mã QR
+   -------------------------------------------------------------------------
+   Nhân viên xoay màn hình ra cho khách quét, nên hai mã phải đủ to để quét
+   được từ khoảng cách một sải tay qua mặt bàn.
+   ========================================================================= */
+
+.qr-modal { max-width: 620px; }
+
+.qr-hint {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.qr-pair {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.qr-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2, var(--surface));
+  text-align: center;
+}
+
+.qr-item img {
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 1;
+  /* QR là ảnh bitmap nhỏ phóng to — nội suy mượt làm nhoè ô, máy khó đọc */
+  image-rendering: pixelated;
+  background: #fff;
+  border-radius: var(--r-sm);
+}
+
+.qr-item b { font-size: 14px; }
+
+.qr-url {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-2);
+  word-break: break-all;
+  line-height: 1.35;
+}
+
+@media (max-width: 560px) {
+  .qr-pair { grid-template-columns: 1fr; }
+}
+
 /* =========================================================================
    Ổ đĩa và dọn dẹp
    -------------------------------------------------------------------------

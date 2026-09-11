@@ -296,6 +296,37 @@ export function lastDoneForRoom(roomId: string): Session | null {
     .get(roomId) as Session | undefined) ?? null;
 }
 
+/** Mã đã phát cho phòng nhưng chưa ai nhập ở buồng. */
+export function pendingForRoom(roomId: string): Session | null {
+  return (getDb()
+    .prepare(
+      `SELECT * FROM sessions
+        WHERE room_id = ? AND status = 'created'
+        ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(roomId) as Session | undefined) ?? null;
+}
+
+/**
+ * Phiên mà MÀN HÌNH PHÒNG phải hiện, theo thứ tự ưu tiên:
+ *
+ *   1. Phiên đang chụp trong buồng.
+ *   2. Không có, nhưng nhân viên đã phát mã mới cho phòng -> KHÔNG hiện phiên
+ *      nào, để màn hình quay về bàn phím nhập mã cho khách tiếp theo.
+ *   3. Còn lại thì hiện phiên vừa chụp xong, để khách quét QR.
+ *
+ * Vì sao (2) phải thắng (3): khách trước cầm QR ra ngoài ngồi ghép, phiên của
+ * họ ở trạng thái 'done' hàng chục phút. Nếu màn hình phòng cứ bám vào phiên
+ * đó thì khách MỚI không có chỗ nhập mã — phòng coi như chết dù buồng trống.
+ * QR của khách cũ không mất: nhân viên mở lại được ở trang quản lý.
+ */
+export function roomDisplaySession(roomId: string): Session | null {
+  const active = activeForRoom(roomId);
+  if (active) return active;
+  if (pendingForRoom(roomId)) return null;
+  return lastDoneForRoom(roomId);
+}
+
 export function listSessions(limit = 100): Session[] {
   return getDb()
     .prepare('SELECT * FROM sessions ORDER BY created_at DESC LIMIT ?')

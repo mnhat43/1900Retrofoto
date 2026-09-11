@@ -101,8 +101,9 @@ rất có thể nó đang khởi động, giết lúc đó sẽ thành vòng l�
 | `KHOI-DONG-LAI.bat` | Bật lại server |
 | `SUA-IP.bat` | Ghim lại địa chỉ sau khi IP đổi |
 | `DAT-IP-TINH.bat` | Chuyển DHCP sang IP tĩnh, có đường lùi |
+| `CAP-NHAT.bat` | Chép bản mới đè bản đang chạy, giữ nguyên cấu hình |
 
-Bốn file `.bat` cuối **tự xin quyền Administrator** (`Start-Process -Verb
+Năm file `.bat` cuối **tự xin quyền Administrator** (`Start-Process -Verb
 RunAs`) thay vì bắt nhân viên nhớ chuột phải.
 
 `react` và `react-dom` bị loại — chỉ dùng lúc build, không cần khi chạy.
@@ -111,11 +112,25 @@ RunAs`) thay vì bắt nhân viên nhớ chuột phải.
 
 ## Cập nhật bản mới
 
-Đóng gói lại rồi đưa file `.exe` mới. Cài đè lên bản cũ.
+**Với file .exe:** đóng gói lại rồi cài đè lên bản cũ.
 
-**Dữ liệu khách an toàn:** ảnh và database nằm ở thư mục riêng
-(`D:\photobooth`), không nằm trong thư mục cài đặt. Gỡ cài đặt cũng không
-đụng vào.
+**Với ZIP:** người dùng giải nén gói mới ra một thư mục *khác* (ví dụ
+`Downloads\1900Retrofoto`), rồi chuột phải **`CAP-NHAT.bat`** trong đó →
+*Run as administrator*. Script tự tìm bản đang chạy, dừng server, thay file,
+bật lại.
+
+Vì sao không bảo họ chép đè bằng tay: chép đè cả thư mục là mất `.env.local`
+— mất mật khẩu và mất địa chỉ in vào mã QR, mà triệu chứng chỉ là "server
+không lên", không ai đoán ra nguyên nhân. `CAP-NHAT.bat` sao lưu file đó ra
+`%TEMP%` trước khi động vào bất cứ thứ gì.
+
+Script còn tắt **cả hai** tác vụ Windows trước khi chép. Nếu không, tác vụ
+chính bật lại sau 5 phút hoặc watchdog nhảy vào đúng lúc đang chép dở và
+khoá file lại.
+
+**Dữ liệu khách an toàn:** ảnh, database và khung ảnh nhân viên tải lên đều
+nằm ở thư mục riêng theo `PHOTOBOOTH_DATA` (ví dụ `D:\photobooth`), không nằm
+trong thư mục cài đặt. Gỡ cài đặt cũng không đụng vào.
 
 ---
 

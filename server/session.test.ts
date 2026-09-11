@@ -319,3 +319,60 @@ describe('activeForRoom', () => {
     expect(activeForRoom('1')).toBeNull();
   });
 });
+
+/*
+ * Màn hình phòng phải nhường chỗ cho khách tiếp theo.
+ *
+ * Lỗi từng gặp thật: khách A chụp xong, màn hình hiện QR; nhân viên tạo mã
+ * cho khách B; màn hình phòng vẫn đứng ở QR của A nên B không có chỗ nhập mã.
+ */
+describe('roomDisplaySession', () => {
+  const setStatusRaw = (id: string, status: string) =>
+    getDb().prepare('UPDATE sessions SET status = ? WHERE id = ?').run(status, id);
+
+  it('ưu tiên phiên đang chụp', async () => {
+    const { roomDisplaySession } = await import('./session.ts');
+    const s = createSession({ maxPhotos: 8, roomId: '1' });
+    claimSession('1', s.code);
+    expect(roomDisplaySession('1')?.id).toBe(s.id);
+  });
+
+  it('chụp xong mà chưa có mã mới thì vẫn hiện QR', async () => {
+    const { roomDisplaySession } = await import('./session.ts');
+    const a = createSession({ maxPhotos: 8, roomId: '1' });
+    claimSession('1', a.code);
+    setStatusRaw(a.id, 'done');
+    expect(roomDisplaySession('1')?.id).toBe(a.id);
+  });
+
+  it('có mã mới cho phòng thì bỏ QR, quay về màn nhập mã', async () => {
+    const { roomDisplaySession } = await import('./session.ts');
+    const a = createSession({ maxPhotos: 8, roomId: '1' });
+    claimSession('1', a.code);
+    setStatusRaw(a.id, 'done');
+
+    createSession({ maxPhotos: 8, roomId: '1' });
+    expect(roomDisplaySession('1')).toBeNull();
+  });
+
+  it('mã mới của phòng KHÁC không ảnh hưởng', async () => {
+    const { roomDisplaySession } = await import('./session.ts');
+    const a = createSession({ maxPhotos: 8, roomId: '1' });
+    claimSession('1', a.code);
+    setStatusRaw(a.id, 'done');
+
+    createSession({ maxPhotos: 8, roomId: '2' });
+    expect(roomDisplaySession('1')?.id).toBe(a.id);
+  });
+
+  it('khách mới nhập mã xong thì theo phiên mới, không phải phiên đang ghép', async () => {
+    const { roomDisplaySession } = await import('./session.ts');
+    const a = createSession({ maxPhotos: 8, roomId: '1' });
+    claimSession('1', a.code);
+    setStatusRaw(a.id, 'composed');
+
+    const b = createSession({ maxPhotos: 8, roomId: '1' });
+    claimSession('1', b.code);
+    expect(roomDisplaySession('1')?.id).toBe(b.id);
+  });
+});

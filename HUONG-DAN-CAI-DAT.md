@@ -334,11 +334,28 @@ Khi có bản mới:
 
 1. Vào lại **https://github.com/mnhat43/1900Retrofoto/releases**
 2. Tải file `1900Retrofoto.zip` mới nhất
-3. Giải nén, chép đè lên thư mục `C:\1900Retrofoto` cũ
-4. Chạy lại `CAI-DAT.bat` (chuột phải → Run as administrator)
+3. Chuột phải file → **Extract All…** → **Extract**
+   *(giải nén ngay tại Downloads, **đừng** chép đè lên `C:\1900Retrofoto`)*
+4. Mở thư mục vừa giải nén, **chuột phải `CAP-NHAT.bat`** →
+   **Run as administrator**
+5. Gõ `c` rồi Enter để xác nhận
 
-> **Ảnh khách an toàn.** Ảnh nằm ở thư mục riêng (`E:\photobooth`),
-> không nằm chung với phần mềm.
+Xong. Máy tắt server khoảng 1–2 phút rồi tự bật lại, và in ra địa chỉ để
+bạn mở kiểm tra.
+
+> **Nhớ bấm `Ctrl + Shift + R`** ở trang quản lý và ở cả 3 máy trong phòng
+> chụp sau khi cập nhật — trình duyệt hay giữ lại giao diện cũ.
+
+**Cập nhật lúc nào:** khi không có khách nào đang chụp. Khách đang ghép ảnh
+bằng điện thoại thì vẫn an toàn — làm lại được sau khi server bật lại.
+
+> **Ảnh khách an toàn.** Ảnh, danh sách phiên và khung ảnh bạn đã tải lên
+> đều nằm ở thư mục riêng (`E:\photobooth`), không nằm chung với phần mềm.
+> Mật khẩu và địa chỉ mã QR cũng được giữ nguyên — không phải khai báo lại.
+
+> **Đừng chép đè bằng tay.** Chép đè cả thư mục sẽ xoá mất file cấu hình,
+> và triệu chứng chỉ là "server không lên" chứ không báo gì rõ ràng.
+> `CAP-NHAT.bat` sinh ra để tránh đúng chuyện đó.
 
 ---
 

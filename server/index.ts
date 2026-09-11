@@ -8,9 +8,10 @@ import QRCode from 'qrcode';
 import { CONFIG, warnIfInsecure } from './config.ts';
 import { getDb } from './db.ts';
 import {
-  createSession, claimSession, getByToken, activeForRoom, lastDoneForRoom,
+  createSession, claimSession, getByToken, activeForRoom, roomDisplaySession,
   listSessions, setStatus, cancelSession, isLockedOut, getById,
   closeSession, busySession, sessionByAnyToken, openSessionsForRoom,
+  LIVE_STATUSES,
 } from './session.ts';
 import { addPhoto, listPhotos, getPhoto, countPhotos, previewName, CaptureError } from './capture.ts';
 import { saveComposite, listComposites, getBySlug } from './composite.ts';
@@ -226,6 +227,29 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     if (requireStaff(ctx)) return true;
     const ok = closeSession(path.split('/')[4]);
     json(res, ok ? 200 : 409, ok ? { ok: true } : { error: 'Phiên không ở trạng thái đóng được' });
+    return true;
+  }
+
+  /**
+   * Hiện lại QR của một phiên trên máy nhân viên.
+   *
+   * Cần vì màn hình phòng bỏ QR ngay khi có mã mới cho phòng đó — khách chưa
+   * kịp quét, hoặc quét rồi mà hết pin, thì nhân viên chìa màn hình ra.
+   *
+   * Không nhét sẵn QR vào /api/staff/rooms: trang đó đọc lại mỗi 4 giây, mỗi
+   * phiên hai ảnh data-URL vài KB, trong khi nhân viên chỉ mở vài lần mỗi buổi.
+   */
+  if (path.match(/^\/api\/staff\/sessions\/[^/]+\/qr$/) && method === 'GET') {
+    if (requireStaff(ctx)) return true;
+    const s = getById(path.split('/')[4]);
+    if (!s) { json(res, 404, { error: 'Không tìm thấy' }); return true; }
+    // Phiên đã đóng thì token không mở được nữa -> nói thẳng thay vì đưa
+    // nhân viên một mã QR chết để khách quét rồi báo lỗi.
+    if (!LIVE_STATUSES.includes(s.status as (typeof LIVE_STATUSES)[number])) {
+      json(res, 409, { error: 'Phiên đã đóng — QR không còn quét được' });
+      return true;
+    }
+    json(res, 200, { code: s.code, status: s.status, qr: await makeQr(ctx, s.access_token) });
     return true;
   }
 
@@ -450,9 +474,10 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     }
     /*
      * Ưu tiên phiên ĐANG CHỤP; không có thì lấy phiên vừa chụp xong để còn
-     * hiện QR. Buồng đã rảnh rồi nhưng khách vừa xong vẫn cần quét mã.
+     * hiện QR. Buồng đã rảnh rồi nhưng khách vừa xong vẫn cần quét mã — trừ
+     * khi nhân viên đã phát mã cho khách tiếp theo (xem roomDisplaySession).
      */
-    const s = activeForRoom(room) ?? lastDoneForRoom(room);
+    const s = roomDisplaySession(room);
     if (!s) {
       json(res, 200, {
         session: null,

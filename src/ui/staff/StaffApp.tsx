@@ -9,6 +9,7 @@ import {
 import FramesPanel from './FramesPanel';
 import ColorPanel from './ColorPanel';
 import StoragePanel from './StoragePanel';
+import QrModal from './QrModal';
 import { useDialog } from './useDialog';
 import './staff.css';
 
@@ -29,6 +30,14 @@ const STATUS_LABEL: Record<string, string> = {
 
 /** Trạng thái mà nhân viên còn đóng được (phiên đang chiếm phòng). */
 const CLOSABLE = new Set(['created', 'active', 'shooting', 'done', 'composed']);
+
+/**
+ * Trạng thái mà QR còn quét được.
+ *
+ * Chỉ từ 'done' trở đi mới có QR: trước đó khách còn đứng trong buồng, chưa
+ * bấm "Hiện mã QR". Sau khi 'closed' thì token hết hiệu lực, chìa ra vô ích.
+ */
+const QR_SHOWABLE = new Set(['done', 'composed']);
 
 /** Số phiên hiện mỗi trang — đủ để không phải cuộn trên màn hình thường. */
 const PER_PAGE = 10;
@@ -74,6 +83,8 @@ export default function StaffApp() {
   const [view, setView] = useState<'sessions' | 'frames' | 'colors' | 'storage'>('sessions');
   const [disk, setDisk] = useState<DiskInfo | null>(null);
   const { ask, dialog } = useDialog();
+  /** Phiên đang được chìa QR ra cho khách quét lại. */
+  const [qrFor, setQrFor] = useState<{ id: string; code: string } | null>(null);
   const [detail, setDetail] = useState<{
     session: SessionInfo; token: string; photos: PhotoInfo[]; composites: CompositeInfo[];
   } | null>(null);
@@ -299,13 +310,25 @@ export default function StaffApp() {
               {(r.composing ?? []).map((c) => (
                 <div key={c.id} className="composing">
                   <span>Mã {c.code} đang ghép ảnh</span>
-                  <button
-                    className="link"
-                    disabled={busy}
-                    onClick={() => onClose(c.id, c.code)}
-                  >
-                    Đóng
-                  </button>
+                  {/*
+                    Màn hình phòng đã bỏ QR để nhận khách mới, nên đây là chỗ
+                    DUY NHẤT chìa lại QR cho khách cũ chưa kịp quét.
+                  */}
+                  <span className="composing-acts">
+                    <button
+                      className="link"
+                      onClick={() => setQrFor({ id: c.id, code: c.code })}
+                    >
+                      Hiện QR
+                    </button>
+                    <button
+                      className="link"
+                      disabled={busy}
+                      onClick={() => onClose(c.id, c.code)}
+                    >
+                      Đóng
+                    </button>
+                  </span>
                 </div>
               ))}
             </div>
@@ -399,6 +422,14 @@ export default function StaffApp() {
                   )}
                 </td>
                 <td className="right">
+                  {QR_SHOWABLE.has(s.status) && (
+                    <button
+                      className="link"
+                      onClick={() => setQrFor({ id: s.id, code: s.code })}
+                    >
+                      Hiện QR
+                    </button>
+                  )}
                   {s.photos > 0 && s.status !== 'expired' && (
                     <button
                       className="link"
@@ -447,6 +478,10 @@ export default function StaffApp() {
       )}
       </div>
       </div>
+      )}
+
+      {qrFor && (
+        <QrModal id={qrFor.id} code={qrFor.code} onClose={() => setQrFor(null)} />
       )}
 
       {/* Lấy hộ khách quên tải */}

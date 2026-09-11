@@ -104,6 +104,15 @@ export const closeSession = (id: string) =>
 export const cancelSession = (id: string) =>
   req<{ ok: true }>(`/api/staff/sessions/${id}`, { method: 'DELETE' });
 
+/**
+ * Lấy lại hai mã QR của một phiên để chìa cho khách quét.
+ *
+ * Gọi theo yêu cầu chứ không kèm sẵn trong `staffRooms` — ảnh QR là data-URL
+ * khá nặng so với nhịp đọc lại mỗi 4 giây của trang nhân viên.
+ */
+export const staffSessionQr = (id: string) =>
+  req<{ code: string; status: string; qr: QrPair }>(`/api/staff/sessions/${id}/qr`);
+
 export const staffSessionDetail = (id: string) =>
   req<{
     session: SessionInfo;

@@ -8,7 +8,7 @@
 ; Ket qua: build\1900Retrofoto-Setup.exe - chep sang may khac, nhap dup la cai duoc.
 
 #define AppName "1900 Retrofoto"
-#define AppVersion "1.0"
+#define AppVersion "1.1"
 #define AppPublisher "1900 Retrofoto"
 
 [Setup]

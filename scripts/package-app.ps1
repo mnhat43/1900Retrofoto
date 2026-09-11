@@ -104,7 +104,8 @@ function Write-BatFile([string]$Path, [string]$Text) {
 # lib-net.ps1 phai di kem: cac script khac dot-source no
 foreach ($s in @(
     "lib-net.ps1", "setup-gui.ps1", "theo-doi.ps1",
-    "kiem-tra.ps1", "sua-ip.ps1", "dat-ip-tinh.ps1", "khoi-dong-lai.ps1"
+    "kiem-tra.ps1", "sua-ip.ps1", "dat-ip-tinh.ps1", "khoi-dong-lai.ps1",
+    "cap-nhat.ps1"
   )) {
   Copy-Item (Join-Path $PSScriptRoot $s) $OutDir -Force
 }
@@ -182,12 +183,14 @@ foreach ($pair in @(
     @("KIEM-TRA.bat", "kiem-tra.ps1", $true),
     @("KHOI-DONG-LAI.bat", "khoi-dong-lai.ps1", $true),
     @("SUA-IP.bat", "sua-ip.ps1", $true),
-    @("DAT-IP-TINH.bat", "dat-ip-tinh.ps1", $true)
+    @("DAT-IP-TINH.bat", "dat-ip-tinh.ps1", $true),
+    # Chay tu goi MOI vua giai nen, tro sang ban cu dang chay de thay file
+    @("CAP-NHAT.bat", "cap-nhat.ps1", $true)
   )) {
   $tpl = if ($pair[2]) { $elevated } else { $plain }
   Write-BatFile (Join-Path $OutDir $pair[0]) $tpl.Replace('__SCRIPT__', $pair[1])
 }
-Write-Host "  [ok] Da tao KIEM-TRA / KHOI-DONG-LAI / SUA-IP / DAT-IP-TINH"
+Write-Host "  [ok] Da tao KIEM-TRA / KHOI-DONG-LAI / SUA-IP / DAT-IP-TINH / CAP-NHAT"
 
 # --- 10. Loi tat mo trang quan ly ---
 #

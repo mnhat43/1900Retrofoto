@@ -94,10 +94,45 @@ const tokenA = detailA.body.token;
 const guestA = await api(`/api/s?t=${encodeURIComponent(tokenA)}`);
 check('khách vừa chụp xong VẪN mở được QR', guestA.status === 200);
 
+/*
+ * Trước khi có mã mới, màn hình phòng vẫn phải hiện QR của khách vừa xong —
+ * họ còn đứng đó chờ quét.
+ */
+const beforeNew = await api('/api/room/session?room=1');
+check('chưa có mã mới: màn hình phòng còn hiện QR của khách vừa xong',
+  beforeNew.body.session?.code === a.body.code && !!beforeNew.body.qr,
+  JSON.stringify(beforeNew.body.session));
+
 const next = await mk('1');
 check('tạo được mã mới cho phòng ngay', next.status === 200 && !!next.body.code,
   JSON.stringify(next.body));
 check('mã mới khác mã của khách đang ghép', next.body.code !== a.body.code);
+
+/*
+ * Có mã mới là màn hình phòng phải BỎ QR ngay, quay về bàn phím nhập mã.
+ *
+ * Nếu không, khách mới cầm mã 7600 đứng trước màn hình đang hiện QR của
+ * khách 7038 và không có chỗ nào để nhập — phòng chết dù buồng trống.
+ */
+const afterNew = await api('/api/room/session?room=1');
+check('có mã mới: màn hình phòng quay về màn nhập mã',
+  afterNew.body.session === null, JSON.stringify(afterNew.body.session));
+check('màn nhập mã không kèm QR của khách cũ', !afterNew.body.qr);
+
+/* QR của khách cũ không mất — nhân viên chìa lại được từ trang quản lý. */
+const qrBack = await api(`/api/staff/sessions/${a.body.id}/qr`);
+check('nhân viên hiện lại được QR của khách đang ghép',
+  qrBack.status === 200 && qrBack.body.qr?.view?.startsWith('data:image/'),
+  JSON.stringify(qrBack.body).slice(0, 120));
+check('QR hiện lại đúng phiên', qrBack.body.code === a.body.code);
+
+/*
+ * Phòng 2 cũng có mã chờ khách (chưa ai nhập) nên cũng phải là màn nhập mã —
+ * và nhập được đúng mã của nó, không bị mã phòng 1 làm nhiễu.
+ */
+const room2Screen = await api('/api/room/session?room=2');
+check('phòng 2 đang chờ khách nhập mã', room2Screen.body.session === null,
+  JSON.stringify(room2Screen.body.session));
 
 // Khách mới vào chụp -> màn hình phòng phải theo phiên MỚI
 await api('/api/room/claim', {
@@ -127,6 +162,11 @@ check('nhân viên vẫn xem lại được phiên đã đóng',
 const guest = await api(`/api/s?t=${encodeURIComponent(tokenA)}`);
 check('khách KHÔNG mở được QR của phiên đã đóng', guest.status === 404);
 
+// Đừng để nhân viên chìa ra một mã QR chết rồi khách quét vào trang lỗi
+const qrClosed = await api(`/api/staff/sessions/${a.body.id}/qr`);
+check('không hiện lại QR của phiên đã đóng', qrClosed.status === 409,
+  JSON.stringify(qrClosed.body));
+
 console.log('\n--- Thời gian tạo / kết thúc ---');
 const listed = await api('/api/staff/sessions');
 const row = listed.body.sessions.find((x) => x.id === a.body.id);
@@ -140,6 +180,15 @@ check('phiên còn mở thì chưa có thời gian kết thúc', open2?.doneAt =
   JSON.stringify(open2?.doneAt));
 check('thời gian kết thúc sau thời gian tạo',
   (row?.doneAt ?? 0) >= (row?.createdAt ?? 0));
+
+/*
+ * Dựng một khách "đang ghép ảnh ngoài quán" ở phòng 3 để kiểm tra nút hiện
+ * lại QR trên giao diện. Không tạo mã mới cho phòng 3 — phòng phải còn TRỐNG
+ * thì mấy kiểm tra bên dưới về nút chọn phòng mới còn đúng.
+ */
+const c3 = await mk('3');
+await api('/api/room/claim', { method: 'POST', body: JSON.stringify({ room: '3', code: c3.body.code }) });
+await api('/api/room/finish?room=3', { method: 'POST' });
 
 console.log('\n--- Giao diện nhân viên ---');
 const browser = await chromium.launch();
@@ -158,6 +207,22 @@ check('phòng bận có nút "Đóng phiên"',
 check('nút chọn phòng bận bị khoá',
   (await p.locator('.pkg:disabled').count()) >= 1);
 await p.screenshot({ path: 'scratch/rooms-staff.png' });
+
+/*
+ * Nhân viên chìa lại QR cho khách đang ghép.
+ *
+ * Đây là đường thoát duy nhất sau khi màn hình phòng bỏ QR để nhận khách
+ * mới — hỏng cái này là khách cũ mất ảnh.
+ */
+const qrBtn = p.locator('.composing button.link', { hasText: 'Hiện QR' }).first();
+check('dòng "đang ghép ảnh" có nút hiện lại QR', (await qrBtn.count()) === 1);
+await qrBtn.click();
+await p.waitForSelector('.qr-pair img', { timeout: 5000 });
+check('mở ra đủ hai mã QR (xem ảnh + ghép khung)',
+  (await p.locator('.qr-pair img').count()) === 2);
+await p.screenshot({ path: 'scratch/rooms-qr-lai.png' });
+await p.locator('.qr-modal header button').click();
+check('đóng được cửa sổ QR', (await p.locator('.qr-modal').count()) === 0);
 
 // Dong het roi kiem lai
 for (const r of (await api('/api/staff/rooms')).body.rooms) {
