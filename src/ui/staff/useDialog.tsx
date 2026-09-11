@@ -12,13 +12,25 @@ import Dialog, { type DialogSpec } from './Dialog';
  *   return <>...{dialog}</>;
  */
 export function useDialog() {
-  const [spec, setSpec] = useState<DialogSpec | null>(null);
+  /*
+   * `seq` tăng mỗi lần hỏi, và dùng làm `key` của <Dialog>.
+   *
+   * Mỗi lần hỏi là một hộp thoại MỚI hoàn toàn: React tháo cái cũ, dựng cái
+   * mới, nên state bên trong khởi tạo lại từ spec mới ngay ở render đầu.
+   * Không có key thì Dialog bị dùng lại và phải tự đồng bộ state theo prop
+   * bằng effect — đúng cái bẫy làm ô nhập rỗng một nhịp trước khi điền.
+   */
+  const [state, setState] = useState<{ spec: DialogSpec; seq: number } | null>(null);
 
-  const ask = useCallback((s: DialogSpec) => setSpec(s), []);
-  const close = useCallback(() => setSpec(null), []);
+  const ask = useCallback((s: DialogSpec) => {
+    setState((prev) => ({ spec: s, seq: (prev?.seq ?? 0) + 1 }));
+  }, []);
+  const close = useCallback(() => setState(null), []);
 
   return {
     ask,
-    dialog: <Dialog spec={spec} onClose={close} />,
+    dialog: state
+      ? <Dialog key={state.seq} spec={state.spec} onClose={close} />
+      : null,
   };
 }

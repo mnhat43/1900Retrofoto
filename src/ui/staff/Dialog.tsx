@@ -27,28 +27,32 @@ export type DialogSpec = {
   onConfirm: (value: string) => void;
 };
 
+/**
+ * Nhận spec KHÔNG null, và được `useDialog` gắn `key` mới cho mỗi lần hỏi.
+ *
+ * Nhờ vậy giá trị điền sẵn là GIÁ TRỊ KHỞI TẠO của state, có ngay ở lần render
+ * đầu. Bản trước đặt nó trong useEffect, mà effect chạy SAU khi DOM đã dựng:
+ * thuộc tính `open` của <dialog> vào ngay còn ô nhập phải đợi React render
+ * lại, nên có một nhịp ô rỗng — đủ để chớp mắt thấy trống, và đủ để bài kiểm
+ * chứng đọc trúng lúc đó rồi báo hỏng.
+ */
 export default function Dialog({
   spec, onClose,
-}: { spec: DialogSpec | null; onClose: () => void }) {
+}: { spec: DialogSpec; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(spec.input?.value ?? '');
 
+  // Chỉ còn việc phải đụng tới DOM thật, không còn setState trong effect.
   useEffect(() => {
-    if (!spec) return;
-    setValue(spec.input?.value ?? '');
     // showModal() mới tạo lớp phủ và bẫy tiêu điểm; open=true thì không.
     ref.current?.showModal();
 
     // Bôi đen sẵn tên cũ: gõ là thay luôn, không phải xoá từng ký tự.
     // React bỏ qua autoFocus bên trong <dialog>, nên phải tự gọi.
-    if (spec.input) {
-      const el = ref.current?.querySelector('input');
-      el?.focus();
-      el?.select();
-    }
-  }, [spec]);
-
-  if (!spec) return null;
+    const el = ref.current?.querySelector('input');
+    el?.focus();
+    el?.select();
+  }, []);
 
   const needsValue = !!spec.input;
   const canConfirm = !needsValue || value.trim() !== '';
