@@ -279,13 +279,21 @@ export type FrameAnalysis = {
   widthInch: number;
   heightInch: number;
   slots: Array<{ x: number; y: number; w: number; h: number }>;
+  /** Ảnh đặc: lúc lưu server sẽ khoét lỗ theo các ô nhân viên đặt. */
+  duc: boolean;
 };
 
-/** Dò thử file khung mà chưa lưu, để nhân viên xem trước. */
+/*
+ * Gửi nguyên file, khai đúng loại của nó.
+ *
+ * Server đọc thẳng body bằng sharp nên content-type chỉ là khai báo, nhưng
+ * khai 'image/png' cho một file JPG là nói sai — và sẽ lừa chính chúng ta khi
+ * đọc log hay bắt gói tin về sau.
+ */
 export const analyzeFrame = (file: File) =>
   req<FrameAnalysis>('/api/staff/frames/analyze', {
     method: 'POST',
-    headers: { 'content-type': 'image/png' },
+    headers: { 'content-type': file.type || 'application/octet-stream' },
     body: file,
   });
 
@@ -304,7 +312,7 @@ export const uploadFrame = (
   if (opts.heightInch) q.set('hin', String(opts.heightInch));
   return req<{ frame: ApiFrame }>(`/api/staff/frames?${q}`, {
     method: 'POST',
-    headers: { 'content-type': 'image/png' },
+    headers: { 'content-type': file.type || 'application/octet-stream' },
     body: file,
   });
 };

@@ -176,15 +176,13 @@ export default function FramesPanel() {
         </div>
         <div>
           {/*
-            Mọi định dạng ảnh giữ được vùng trong suốt. KHÔNG có JPG: định
-            dạng đó không lưu được độ trong suốt, mà cả cơ chế khung dựa vào
-            đúng thứ đó để biết lỗ nằm ở đâu. Để JPG lọt vào hộp chọn file chỉ
-            khiến nhân viên chọn rồi nhận lỗi.
+            Nhận mọi loại ảnh. Ảnh có sẵn vùng trong suốt thì dò ô tự động;
+            ảnh đặc (JPG...) thì nhân viên tự đặt ô và server khoét lỗ theo.
           */}
           <input
             ref={fileInput}
             type="file"
-            accept="image/png,image/webp,image/avif,image/gif"
+            accept="image/*"
             hidden
             onChange={(e) => onPick(e.target.files?.[0])}
           />
@@ -209,6 +207,7 @@ export default function FramesPanel() {
           <SlotEditor
             src={pending.url}
             slots={pending.analysis.slots}
+            ratio={pending.analysis.width / pending.analysis.height}
             onChange={(slots) => setPending({
               ...pending,
               analysis: { ...pending.analysis, slots },
@@ -261,13 +260,38 @@ export default function FramesPanel() {
               {Math.round(pending.analysis.widthInch * 300)}×
               {Math.round(pending.analysis.heightInch * 300)}px ở 300 DPI.
             </p>
-            <p className="muted small">
-              Kiểm tra các ô đánh số có trùng lỗ trên khung không rồi hãy lưu.
-            </p>
+            {/*
+              Hai đường vào màn này cần hai lời nhắc khác nhau. Khung đã có lỗ
+              thì việc của nhân viên là ĐỐI CHIẾU ô với lỗ; khung đặc thì ô
+              chính là thứ quyết định lỗ sẽ được khoét ở đâu — nói nhầm một
+              câu là nhân viên làm nhầm việc.
+            */}
+            {pending.analysis.duc ? (
+              <p className="muted small">
+                Ảnh này không có sẵn vùng trong suốt, nên các ô bạn đặt sẽ được
+                khoét thủng để ảnh khách hiện qua. Phần còn lại của khung giữ
+                nguyên.
+              </p>
+            ) : (
+              <p className="muted small">
+                Kiểm tra các ô đánh số có trùng lỗ trên khung không rồi hãy lưu.
+              </p>
+            )}
+
+            {pending.analysis.slots.length === 0 && (
+              <p className="warn-box small">
+                Chưa có ô nào — khách sẽ không có chỗ đặt ảnh. Kéo trên ảnh để
+                vẽ ô, hoặc dùng nút xếp nhanh.
+              </p>
+            )}
 
             <div className="preview-actions">
-              <button className="primary" disabled={!!busy || !pending.label.trim()}
-                onClick={onSave}>
+              <button
+                className="primary"
+                disabled={!!busy || !pending.label.trim()
+                  || pending.analysis.slots.length === 0}
+                onClick={onSave}
+              >
                 {busy || 'Lưu khung'}
               </button>
               <button className="ghost" disabled={!!busy} onClick={() => {
@@ -306,7 +330,7 @@ export default function FramesPanel() {
 
         {frames.length === 0 && (
           <p className="muted" style={{ padding: 20, textAlign: 'center' }}>
-            Chưa có khung nào. Tải file PNG có nền trong suốt lên để bắt đầu.
+            Chưa có khung nào. Tải một file ảnh khung lên để bắt đầu.
           </p>
         )}
       </div>

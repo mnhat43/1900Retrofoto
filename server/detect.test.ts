@@ -141,12 +141,19 @@ describe('detectSlots', () => {
     expect(r.slots.every((s) => s.w < 0.95 && s.h < 0.95)).toBe(true);
   });
 
-  it('báo lỗi rõ ràng khi PNG không có nền trong suốt', async () => {
+  /*
+   * Ảnh đặc KHÔNG phải lỗi: nhân viên sẽ tự đặt ô, rồi khâu lưu khoét lỗ theo.
+   * Vẫn phải trả về kích thước thật, vì màn nắn ô dựng lưới theo tỉ lệ đó.
+   */
+  it('ảnh không có vùng trong suốt: trả về 0 ô, không ném lỗi', async () => {
     const solid = await sharp({
-      create: { width: 100, height: 100, channels: 3, background: { r: 1, g: 2, b: 3 } },
+      create: { width: 120, height: 80, channels: 3, background: { r: 1, g: 2, b: 3 } },
     }).png().toBuffer();
 
-    await expect(detectSlots(solid)).rejects.toThrow(/trong suốt/);
+    const r = await detectSlots(solid);
+    expect(r.slots).toEqual([]);
+    expect(r.width).toBe(120);
+    expect(r.height).toBe(80);
   });
 
   /*
@@ -176,16 +183,14 @@ describe('detectSlots', () => {
     }
   });
 
-  /*
-   * JPEG không lưu được độ trong suốt, nên đây là ngõ cụt chứ không phải lỗi
-   * tạm thời — thông báo phải nói thẳng ra để khỏi thử lại vô ích.
-   */
-  it('nói rõ JPG không dùng làm khung được', async () => {
+  it('nhận cả JPG — 0 ô, nhân viên tự đặt', async () => {
     const jpg = await sharp({
-      create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 255, b: 255 } },
+      create: { width: 600, height: 1800, channels: 3, background: { r: 255, g: 255, b: 255 } },
     }).jpeg().toBuffer();
 
-    await expect(detectSlots(jpg)).rejects.toThrow(/JPG/);
+    const r = await detectSlots(jpg);
+    expect(r.slots).toEqual([]);
+    expect(r.width).toBe(600);
   });
 
   it('báo lỗi đọc file khi đưa vào thứ không phải ảnh', async () => {

@@ -79,15 +79,61 @@ r = await api('/api/staff/frames/analyze', {
 check('dò thử: đúng 9 ô', r.body?.slots?.length === 9, `${r.body?.slots?.length} ô`);
 check('dò thử: đoán đúng khổ 6×6', r.body?.formatId === 'square66', r.body?.formatId);
 
-// Ảnh đặc (không có kênh alpha) phải bị từ chối với lời nhắn hiểu được
+/*
+ * Ảnh đặc (JPG, hay PNG xuất kèm nền) KHÔNG còn bị từ chối: dò ra 0 ô, nhân
+ * viên tự đặt ô, rồi khâu lưu khoét lỗ theo. Kiểm cả ba nhịp đó qua HTTP thật.
+ */
 const solid = await sharp({
   create: { width: 600, height: 1800, channels: 3, background: { r: 9, g: 9, b: 9 } },
-}).png().toBuffer();
+}).jpeg().toBuffer();
+
 r = await api('/api/staff/frames/analyze', {
-  method: 'POST', headers: { 'content-type': 'image/png' }, body: solid,
+  method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: solid,
 });
-check('từ chối ảnh không có nền trong suốt', r.status === 400, `nhận ${r.status}`);
-check('báo lỗi nói rõ vì sao', /trong suốt/.test(r.body?.error ?? ''), r.body?.error);
+check('ảnh đặc: nhận file, dò ra 0 ô', r.status === 200 && r.body?.slots?.length === 0,
+  `${r.status} / ${r.body?.slots?.length} ô`);
+check('ảnh đặc: đánh dấu duc để giao diện nhắc đúng việc', r.body?.duc === true, `${r.body?.duc}`);
+check('ảnh đặc: vẫn trả kích thước thật cho màn nắn ô',
+  r.body?.width === 600 && r.body?.height === 1800, `${r.body?.width}x${r.body?.height}`);
+
+// Không ô nào thì khung che kín ảnh khách - khâu lưu phải chặn
+r = await api(`/api/staff/frames?label=${encodeURIComponent('Quen ve o')}`, {
+  method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: solid,
+});
+check('ảnh đặc: KHÔNG lưu khi chưa vẽ ô nào', r.status === 400, `nhận ${r.status}`);
+check('ảnh đặc: lời nhắn bảo đi vẽ ô', /ô nào/.test(r.body?.error ?? ''), r.body?.error);
+
+/*
+ * Có ô -> lưu được. Và phải kiểm LỖ CÓ THẬT SỰ ĐƯỢC KHOÉT trên file phục vụ
+ * ra: khung đè lên trên ảnh khách lúc render, nên khoét hỏng là khách nhận
+ * tấm che kín mà không có lỗi nào báo ra.
+ */
+const oTuDat = [{ x: 0.1, y: 0.05, w: 0.8, h: 0.4 }, { x: 0.1, y: 0.5, w: 0.8, h: 0.4 }];
+r = await api(`/api/staff/frames?label=${encodeURIComponent('Khung JPG tu dat o')}`
+  + `&slots=${encodeURIComponent(encodeURIComponent(JSON.stringify(oTuDat)))}`, {
+  method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: solid,
+});
+check('ảnh đặc: lưu được khi đã đặt ô', r.status === 200 && r.body?.frame?.slotCount === 2,
+  `${r.status} / ${r.body?.frame?.slotCount} ô`);
+
+if (r.body?.frame) {
+  const ducFrame = r.body.frame;
+  const kBuf = Buffer.from(await (await fetch(BASE + ducFrame.overlaySrc)).arrayBuffer());
+  check('ảnh đặc: file lưu ra có kênh alpha',
+    (await sharp(kBuf).metadata()).hasAlpha === true);
+
+  const { data: kPix, info: kInfo } = await sharp(kBuf).ensureAlpha().raw()
+    .toBuffer({ resolveWithObject: true });
+  let trong = 0;
+  for (let i = 3; i < kPix.length; i += kInfo.channels) if (kPix[i] < 128) trong++;
+  const tiLe = trong / (kInfo.width * kInfo.height);
+  // 2 ô x 0.8 x 0.4 = 64% diện tích
+  check('ảnh đặc: khoét đúng hai ô đã đặt', Math.abs(tiLe - 0.64) < 0.02,
+    `trong suốt ${(tiLe * 100).toFixed(1)}%`);
+
+  // Dọn đi: các phép đếm khung phía dưới tính theo 6 mẫu + 1 khung của quán
+  await api(`/api/staff/frames/${ducFrame.id}`, { method: 'DELETE' });
+}
 
 r = await api(`/api/staff/frames?label=${encodeURIComponent('Khung Của Quán')}`, {
   method: 'POST', headers: { 'content-type': 'image/png' }, body: PNG('basic-6'),

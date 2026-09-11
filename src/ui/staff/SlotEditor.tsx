@@ -3,11 +3,17 @@ import { useRef, useState } from 'react';
 export type Rect = { x: number; y: number; w: number; h: number };
 
 /**
- * Nắn lại các ô trên khung bằng chuột.
+ * Đặt các ô chứa ảnh khách lên khung.
  *
- * Dò tự động đúng với phần lớn khung, nhưng khung vẽ tay có thể có lỗ dính
- * nhau, lỗ trang trí, hoặc viền mờ làm lệch mép. Màn này để sửa nốt những
- * trường hợp đó mà không phải bỏ cả file.
+ * Hai đường vào màn này:
+ *   - Khung có sẵn vùng trong suốt -> ô đã dò tự động, ở đây chỉ sửa nốt chỗ
+ *     lệch (lỗ dính nhau, lỗ trang trí, viền mờ làm lệch mép).
+ *   - Khung là ảnh đặc (JPG, hay PNG xuất kèm nền) -> KHÔNG có ô nào, nhân
+ *     viên tự đặt. Lúc lưu, server khoét lỗ trong suốt theo đúng các ô này.
+ *
+ * Vì đường thứ hai bắt đầu từ con số không nên màn này phải tự làm được việc
+ * đó cho nhanh: có nút xếp lưới sẵn, chứ kéo tay từng ô cho đều nhau thì rất
+ * cực và không bao giờ thẳng hàng.
  *
  * Toạ độ luôn CHUẨN HOÁ 0..1 — giống hệt thứ server lưu và phần render dùng,
  * nên kéo trên ảnh xem trước bao nhiêu pixel cũng không quan trọng.
@@ -18,21 +24,72 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 /** Ô nhỏ hơn mức này coi như bấm nhầm, không cho tạo. */
 const MIN_SIZE = 0.02;
 
+/** Lề quanh mép khung và khe giữa các ô khi xếp lưới, theo tỉ lệ ảnh. */
+const LE = 0.06;
+const KHE = 0.03;
+
+/**
+ * Xếp n ô thành lưới đều nhau.
+ *
+ * Số cột chọn theo cách khung ảnh thật hay được bố trí: dải dọc xếp một cột,
+ * 4 ô thành 2x2, 6 ô thành 2x3, 9 ô thành 3x3. Nhân viên kéo lại được hết,
+ * đây chỉ là điểm bắt đầu đỡ phải căn tay.
+ */
+function xepLuoi(n: number, tiLe: number): Rect[] {
+  // Khung cao hơn rộng nhiều (dải 2x6) thì xếp một cột cho giống khung thật
+  const cot = tiLe < 0.5 ? 1
+    : n <= 2 ? 1
+      : n <= 4 ? 2
+        : n <= 6 ? 2
+          : 3;
+  const hang = Math.ceil(n / cot);
+
+  const wO = (1 - LE * 2 - KHE * (cot - 1)) / cot;
+  const hO = (1 - LE * 2 - KHE * (hang - 1)) / hang;
+
+  const out: Rect[] = [];
+  for (let i = 0; i < n; i++) {
+    const c = i % cot;
+    const r = Math.floor(i / cot);
+    out.push({
+      x: LE + c * (wO + KHE),
+      y: LE + r * (hO + KHE),
+      w: wO,
+      h: hO,
+    });
+  }
+  return out;
+}
+
 type Drag =
   | { mode: 'move'; i: number; dx: number; dy: number }
   | { mode: 'resize'; i: number }
   | { mode: 'draw'; i: number; x0: number; y0: number };
 
 export default function SlotEditor({
-  src, slots, onChange,
+  src, slots, onChange, ratio = 1,
 }: {
   src: string;
   slots: Rect[];
   onChange: (slots: Rect[]) => void;
+  /** Bề rộng / chiều cao của file ảnh — quyết định lưới dựng ra mấy cột. */
+  ratio?: number;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [active, setActive] = useState<number | null>(null);
+  /*
+   * Lịch sử để hoàn tác. Nắn ô là thao tác kéo chuột nên rất dễ lỡ tay —
+   * xoá nhầm một ô vừa căn xong mà không lùi lại được thì phải làm lại từ đầu.
+   * Chỉ ghi lại các bước RỜI RẠC (thêm/xoá/xếp lưới), không ghi từng nhịp kéo.
+   */
+  const [undo, setUndo] = useState<Rect[][]>([]);
+
+  /** Đổi danh sách ô kèm ghi lại bước trước đó để hoàn tác được. */
+  function apply(next: Rect[]) {
+    setUndo((h) => [...h.slice(-19), slots]);
+    onChange(next);
+  }
 
   /** Toạ độ chuột -> toạ độ chuẩn hoá trong ảnh. */
   function at(e: { clientX: number; clientY: number }): { x: number; y: number } {
@@ -79,9 +136,14 @@ export default function SlotEditor({
 
   /** Bấm vào nền (không trúng ô nào) -> vẽ ô mới. */
   function onDown(e: React.PointerEvent) {
-    if (e.target !== box.current && !(e.target as HTMLElement).classList.contains('se-img')) return;
+    // Lớp nhắc "chưa có ô nào" đè lên ảnh nhưng để pointer-events: none, nên
+    // cú kéo vẫn rơi xuống .se-img phía dưới và không cần xét riêng ở đây.
+    if (e.target !== box.current
+      && !(e.target as HTMLElement).classList.contains('se-img')) return;
     const p = at(e);
     const i = slots.length;
+    // Ghi lịch sử TRƯỚC khi thêm, để Hoàn tác quay về đúng lúc chưa có ô này
+    setUndo((h) => [...h.slice(-19), slots]);
     onChange([...slots, { x: p.x, y: p.y, w: 0, h: 0 }]);
     setActive(i);
     setDrag({ mode: 'draw', i, x0: p.x, y0: p.y });
@@ -98,6 +160,40 @@ export default function SlotEditor({
       */}
       <span className="field-label">Các ô ảnh · {slots.length} ô</span>
 
+      {/*
+        Thanh xếp nhanh. Đây là thứ cứu đường "khung là ảnh đặc": nhân viên
+        vào màn này với 0 ô, và kéo tay 6 ô cho đều nhau thì vừa lâu vừa không
+        thẳng hàng. Bấm một nút ra lưới đều rồi nắn lại vài ô là xong.
+      */}
+      <div className="se-tools">
+        <span className="muted small">Xếp nhanh</span>
+        {[1, 2, 3, 4, 6, 9].map((n) => (
+          <button
+            key={n}
+            type="button"
+            className="se-chip"
+            onClick={() => apply(xepLuoi(n, ratio))}
+            title={`Xếp ${n} ô đều nhau`}
+          >
+            {n}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="link"
+          disabled={!undo.length}
+          onClick={() => {
+            const prev = undo[undo.length - 1];
+            if (!prev) return;
+            setUndo((h) => h.slice(0, -1));
+            onChange(prev);
+            setActive(null);
+          }}
+        >
+          Hoàn tác
+        </button>
+      </div>
+
       <div
         className="preview-img se-box"
         ref={box}
@@ -107,6 +203,18 @@ export default function SlotEditor({
         onPointerCancel={onUp}
       >
         <img className="se-img" src={src} alt="" draggable={false} />
+
+        {/*
+          Khung đặc vào đây với 0 ô, và một tấm ảnh trơn không gợi ra rằng
+          phải kéo lên nó. Nói thẳng ra, đặt ngay trên ảnh chứ không nhét
+          xuống dòng chú thích phía dưới.
+        */}
+        {slots.length === 0 && (
+          <div className="se-empty">
+            <b>Chưa có ô nào</b>
+            <span>Kéo trên ảnh để vẽ ô, hoặc bấm một số ở trên để xếp sẵn</span>
+          </div>
+        )}
 
         {slots.map((s, i) => (
           <span
@@ -142,7 +250,8 @@ export default function SlotEditor({
       </div>
 
       <p className="se-hint muted small">
-        Kéo ô để di chuyển · kéo góc để đổi cỡ · kéo trên nền để thêm ô
+        Kéo ô để di chuyển · kéo góc để đổi cỡ · kéo trên nền để thêm ô.
+        Ô là chỗ ảnh khách hiện ra.
       </p>
 
       {/*
@@ -160,7 +269,7 @@ export default function SlotEditor({
               type="button"
               className="link danger"
               onClick={() => {
-                onChange(slots.filter((_, i) => i !== picked));
+                apply(slots.filter((_, i) => i !== picked));
                 setActive(null);
               }}
             >

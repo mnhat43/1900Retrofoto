@@ -880,6 +880,68 @@ button.link.danger { color: var(--danger); }
 .se-hint { margin: 0; }
 
 /*
+ * Thanh xếp nhanh. Con số phải to đủ bấm trúng bằng chuột cùi ở quán, nên
+ * dùng ô vuông 28px chứ không phải chữ trần.
+ */
+.se-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/*
+ * Hoàn tác đẩy sang phải khi còn chỗ, nhưng KHÔNG được là thứ duy nhất trên
+ * một dòng mới: cột khung dải dọc rất hẹp, margin-left:auto đơn thuần làm nó
+ * rơi xuống dòng riêng và lửng lơ giữa khoảng trắng.
+ */
+.se-tools > .link {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.se-chip {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.se-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/*
+ * Lời nhắc khi chưa có ô nào, đặt ĐÈ LÊN ảnh.
+ * pointer-events phải đi qua được: đây là lúc nhân viên cần kéo lên ảnh nhất,
+ * mà lớp chữ chắn ngang thì kéo không ăn.
+ */
+.se-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  pointer-events: none;
+}
+
+.se-empty b { font-size: 13px; color: var(--text-1); }
+.se-empty span { font-size: 12px; color: var(--text-2); }
+
+/*
  * Hàng "đang chọn ô": LUÔN CÓ MẶT và cao cố định.
  * Cho hàng hiện lên theo lúc chọn thì mỗi cú bấm vào ô lại đẩy cả phần dưới
  * nhảy một nhịp — nắn vài ô là chóng mặt.
