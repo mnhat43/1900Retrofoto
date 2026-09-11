@@ -218,14 +218,15 @@ export default function StaffApp() {
   return (
     <div className="staff">
       <header>
-        <span className="brand">
+        {/*
+          Số bản đang chạy nằm ở tooltip chứ không in cạnh logo: nhân viên
+          nhìn thanh này cả trăm lần mỗi ngày và không cần tới nó, nhưng vẫn
+          phải tra được khi hỏi từ xa "máy đang chạy bản nào" hoặc để kiểm
+          chứng sau khi bấm CAP-NHAT — bản sau có thể chỉ sửa lỗi ngầm,
+          không đổi gì trên giao diện để mà nhìn ra.
+        */}
+        <span className="brand" title={version ? `Phiên bản ${version}` : undefined}>
           <span className="n">1900</span><span className="w">Retrofoto</span>
-          {/*
-            Số bản đang chạy. Cần khi hỏi từ xa "máy đang chạy bản nào" và
-            để kiểm chứng sau khi bấm CAP-NHAT — bản sau có thể chỉ sửa lỗi
-            ngầm, không đổi gì trên giao diện để mà nhìn ra.
-          */}
-          {version && <span className="ver">v{version}</span>}
         </span>
 
         <nav className="tabs">
