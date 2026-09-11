@@ -198,3 +198,65 @@ function Start-Server([string]$AppDir) {
   }
   return 'none'
 }
+
+# ---------------------------------------------------------------------------
+# Kiem tra mang sau khi doi dia chi
+# ---------------------------------------------------------------------------
+
+<#
+  Cho dia chi vua dat xong san sang dung.
+
+  Dat xong New-NetIPAddress thi dia chi chua dung duoc ngay: Windows con phai
+  hoi xem co may nao trong mang dang giu so do khong (duplicate address
+  detection). Trong luc do AddressState la 'Tentative' va moi goi gui ra deu
+  roi. Tren WiFi viec nay mat 3-5 giay, doi khi lau hon.
+
+  Truoc day script chi Start-Sleep 3 giay roi ping luon - hoi som mot hai giay
+  la ping hong, va script tuong mat mang nen tra lai DHCP trong khi mang van
+  tot. Cho den khi 'Preferred' thi khong con doan mo ho nua.
+#>
+function Wait-IpReady([int]$InterfaceIndex, [string]$IPAddress, [int]$TimeoutSec = 20) {
+  $deadline = (Get-Date).AddSeconds($TimeoutSec)
+  while ((Get-Date) -lt $deadline) {
+    $a = Get-NetIPAddress -InterfaceIndex $InterfaceIndex -IPAddress $IPAddress `
+      -AddressFamily IPv4 -ErrorAction SilentlyContinue
+    if ($a -and $a.AddressState -eq 'Preferred') { return $true }
+    # 'Invalid' / 'Duplicate' la hong that, cho them cung vo ich
+    if ($a -and ($a.AddressState -eq 'Invalid' -or $a.AddressState -eq 'Duplicate')) { return $false }
+    Start-Sleep -Milliseconds 500
+  }
+  return $false
+}
+
+<#
+  Gateway co voi toi duoc khong.
+
+  KHONG chi dua vao ping: kha nhieu cuc WiFi pho thong tat tra loi ICMP, va
+  tuong lua cua may cung chan duoc. Ping hong ma van chay tot la chuyen binh
+  thuong - neu lay ping lam cau tra loi duy nhat thi script se tra lai DHCP
+  oan, dung luc mang chang lam sao ca.
+
+  Nen thu hai duong, thong mot duong la du:
+    1. Ping - nhanh va ro rang nhat khi no chay
+    2. ARP  - may da hoi ra dia chi vat ly cua gateway thi lop 2 chac chan
+              thong, du gateway im lang truoc ICMP
+
+  Tra ve: 'ping' | 'arp' | $null (khong duong nao thong)
+#>
+function Test-GatewayReachable([string]$Gateway, [int]$InterfaceIndex, [int]$Retries = 3) {
+  for ($i = 0; $i -lt $Retries; $i++) {
+    if ($i -gt 0) { Start-Sleep -Seconds 2 }
+
+    if (Test-Connection -ComputerName $Gateway -Count 2 -Quiet -ErrorAction SilentlyContinue) {
+      return 'ping'
+    }
+
+    # Ping vua roi da buoc may phai hoi ARP; gio xem co loi giai dap khong.
+    $n = Get-NetNeighbor -InterfaceIndex $InterfaceIndex -IPAddress $Gateway `
+      -AddressFamily IPv4 -ErrorAction SilentlyContinue
+    if ($n -and $n.State -match 'Reachable|Stale|Delay|Probe|Permanent') {
+      return 'arp'
+    }
+  }
+  return $null
+}

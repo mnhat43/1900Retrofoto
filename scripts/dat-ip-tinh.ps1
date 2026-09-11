@@ -104,8 +104,20 @@ function Restore-Dhcp {
   try { Remove-NetRoute -InterfaceIndex $idx -DestinationPrefix '0.0.0.0/0' -Confirm:$false -ErrorAction SilentlyContinue } catch { }
   try { Set-NetIPInterface -InterfaceIndex $idx -Dhcp Enabled -ErrorAction Stop } catch { }
   try { Set-DnsClientServerAddress -InterfaceIndex $idx -ResetServerAddresses -ErrorAction Stop } catch { }
-  # Cho Windows xin lai dia chi
-  Start-Sleep -Seconds 6
+
+  # Cho Windows xin lai dia chi tu cuc WiFi. Cho den khi thay dia chi that
+  # (khong phai 169.254.x - so Windows tu bia ra khi xin that bai) chu khong
+  # ngu cung mot khoang: cuc WiFi cham thi 6 giay khong du, va bao "da tra
+  # lai nhu cu" trong khi may van chua co mang la dieu te nhat co the lam.
+  $deadline = (Get-Date).AddSeconds(30)
+  while ((Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 2
+    $now = Get-NetIPAddress -InterfaceIndex $idx -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+      Where-Object { $_.IPAddress -notlike '169.254.*' -and $_.AddressState -eq 'Preferred' }
+    if ($now) { return }
+  }
+  Write-Host "  Chua xin lai duoc dia chi tu cuc WiFi." -ForegroundColor Red
+  Write-Host "  Thu tat bat lai WiFi, hoac khoi dong lai may." -ForegroundColor White
 }
 
 Write-Host ""
@@ -132,11 +144,24 @@ try {
 # Thu gateway truoc (mang noi bo - cai nay moi anh huong den khach quet QR),
 # roi thu ra internet. Mat internet thi canh bao chu khong tra lai, vi quan
 # van ban hang duoc; mat gateway thi phai tra lai ngay.
-Write-Host "  Dang thu mang..." -ForegroundColor Gray
-Start-Sleep -Seconds 3
+Write-Host "  Dang cho dia chi san sang..." -ForegroundColor Gray
+$ready = Wait-IpReady $idx $ip
 
-$lanOk = Test-Connection -ComputerName $gw -Count 2 -Quiet -ErrorAction SilentlyContinue
-if (-not $lanOk) {
+if (-not $ready) {
+  Write-Host "  Dia chi $ip khong dung duoc (co the may khac dang giu so nay)." -ForegroundColor Red
+  Restore-Dhcp
+  Write-Host "  Da tra lai nhu cu. May van dung duoc binh thuong." -ForegroundColor Yellow
+  Write-Host "  Nho ky thuat dat IP tinh gium." -ForegroundColor White
+  Write-Host ""
+  Write-Host "  Nhan Enter de dong." -ForegroundColor Gray
+  [void](Read-Host)
+  exit 1
+}
+
+Write-Host "  Dang thu mang..." -ForegroundColor Gray
+$how = Test-GatewayReachable $gw $idx
+
+if (-not $how) {
   Write-Host "  MANG NOI BO KHONG THONG sau khi ghim." -ForegroundColor Red
   Restore-Dhcp
   Write-Host "  Da tra lai nhu cu. May van dung duoc binh thuong." -ForegroundColor Yellow
@@ -148,6 +173,11 @@ if (-not $lanOk) {
 }
 
 Write-Host "  [ok] Mang noi bo thong - khach quet QR duoc" -ForegroundColor Green
+if ($how -eq 'arp') {
+  # Cuc WiFi khong tra loi ping nhung van chuyen goi binh thuong. Khong phai
+  # loi, chi ghi ra de ky thuat khoi hoang khi tu ping thu thay im.
+  Write-Host "      (cuc WiFi khong tra loi ping - binh thuong, mang van chay)" -ForegroundColor Gray
+}
 
 $netOk = $false
 try {
