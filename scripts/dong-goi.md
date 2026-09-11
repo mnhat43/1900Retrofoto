@@ -168,21 +168,49 @@ trong thư mục cài đặt. Gỡ cài đặt cũng không đụng vào.
 ## Phát hành một bản
 
 ```powershell
-# 1. Bump: package.json "version" = 1.3.0  va installer.iss AppVersion = "1.3"
-# 2. Kiem tra
-npm run build; npx vitest run; npm run verify
-
-# 3. Dong goi (tu chan neu hai so tren lech nhau)
-powershell -ExecutionPolicy Bypass -File scripts\package-app.ps1
-Compress-Archive -Path build\1900Retrofoto -DestinationPath build\1900Retrofoto.zip -CompressionLevel Optimal
-
-# 4. Phat hanh
-git tag -a v1.3.0 -m "..."; git push origin main; git push origin v1.3.0
-gh release create v1.3.0 build\1900Retrofoto.zip --title "..." --notes-file <file>
+powershell -ExecutionPolicy Bypass -File scripts\phat-hanh.ps1 1.3.0
 ```
+
+Một lệnh, 8 bước: kiểm tra → test → ghi chú → bump version → đóng gói → nén →
+commit + tag → push + tạo release.
+
+| Tham số | Làm gì |
+|---|---|
+| `-DryRun` | Làm hết ở máy nhưng **không** push, **không** tạo release. Xem thử ZIP trước khi công bố. |
+| `-NotesFile <đường dẫn>` | Dùng ghi chú viết sẵn thay vì mở Notepad |
+| `-Title "<chuỗi>"` | Tiêu đề release. Mặc định `v1.3.0` |
+| `-SkipVerify` | Bỏ `npm run verify` (chạy Playwright, lâu). Unit test vẫn chạy |
+
+### Nó chặn những gì
+
+Toàn bộ kiểm tra chạy **trước khi sửa bất cứ file nào** — hỏng ở khâu kiểm tra
+thì kho còn nguyên vẹn, không phải dọn dẹp:
+
+- Số phiên bản đúng dạng `X.Y.Z` và lớn hơn bản hiện tại
+- Đang ở nhánh `main`
+- Kho sạch — nếu không, commit bump sẽ **nuốt theo mọi thay đổi đang dang dở**,
+  release chứa code chưa ai xem lại mà lịch sử git chỉ ghi *"chore: phát hành"*
+- Tag chưa tồn tại, cả ở máy lẫn trên GitHub
+- `gh` đã cài và đã đăng nhập
+- Ghi chú không còn dòng nhắc viết lại, và không quá ngắn
+
+Sau khi đóng gói nó còn **đọc lại `package.json` trong gói** để đối chiếu, chứ
+không tin là bước bump đã ngấm — gói sai version là mọi máy ngoài quán kẹt ở bản
+cũ mà không báo gì.
+
+### Ghi chú phát hành
+
+Không truyền `-NotesFile` thì script sinh nháp từ `git log` kể từ tag trước, mở
+Notepad, đợi bạn sửa xong và đóng lại.
+
+**Nháp đó là dàn ý, không phải bản dùng được.** Người đọc ghi chú này là nhân
+viên quán — họ mở trang Releases để biết *"có gì mới"* và *"cập nhật thế nào"*,
+không đọc được `feat: refactor session lookup`. Script từ chối phát hành nếu
+dòng nhắc viết lại còn nguyên trong file.
 
 > ⚠️ Tên asset phải đúng `1900Retrofoto.zip`. `CAP-NHAT` tìm asset theo tên
 > này; đặt khác là mọi máy báo *"bản mới không kèm file 1900Retrofoto.zip"*.
+> Script luôn nén đúng tên này nên chỉ cần để ý khi làm tay.
 
 ---
 
