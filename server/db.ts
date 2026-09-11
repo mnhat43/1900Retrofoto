@@ -128,6 +128,20 @@ function migrate(d: DatabaseSync): void {
     );
     CREATE INDEX IF NOT EXISTS color_presets_enabled
       ON color_presets(enabled, sort_order);
+
+    -- Thiết lập nhân viên đổi được ngay trên trang quản lý.
+    --
+    -- Để trong database chứ không phải .env.local: đổi xong có hiệu lực ngay,
+    -- không phải khởi động lại server, và không giẫm lên file cấu hình do
+    -- trình cài đặt ghi ra (thứ mà CAP-NHAT phải giữ nguyên qua mỗi bản).
+    --
+    -- Kiểu khoá-giá trị chuỗi: thiết lập ở đây lèo tèo vài cái và đọc rất
+    -- thưa, không đáng dựng mỗi thứ một cột rồi phải nâng cấp bảng mỗi lần
+    -- thêm một mục.
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   // --- Nâng cấp database tạo từ bản cũ ---

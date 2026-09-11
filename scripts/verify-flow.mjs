@@ -48,8 +48,10 @@ await staff.click('.login button');
 await staff.waitForSelector('.pkg-row', { timeout: 10000 });
 check('đăng nhập được', true);
 
+// Chỉ còn chọn phòng — ô "số kiểu ảnh" đã bỏ, trần ảnh lấy từ thiết lập chung
 await staff.click('.pkg:has-text("Phòng 1")');
-await staff.click('.pkg:has-text("4 kiểu")');
+check('KHÔNG còn ô chọn số kiểu ảnh',
+  !(await staff.isVisible('.pkg:has-text("kiểu")')));
 await staff.click('button.primary:has-text("Tạo mã")');
 // Mã hiện ở thẻ phòng (khối "Mã cho phòng" đã bỏ)
 await staff.waitForSelector('.room-card.busy .room-code', { timeout: 10000 });
@@ -87,11 +89,15 @@ for (let i = 0; i < 4; i++) {
 }
 
 await room.click('.btn:has-text("Đã chụp xong")');
+// Màn phòng giờ chỉ hiện SỐ ẢNH ĐÃ CHỤP, không còn lưới ô trống và không
+// còn "4/8" — trần ảnh là lưới an toàn của hệ thống, không phải gói khách mua
 await room.waitForFunction(
-  () => document.querySelectorAll('.slot.filled').length === 4,
+  () => document.querySelector('.counter .big')?.textContent?.trim() === '4',
   { timeout: 20000 },
 );
 check('bấm "Đã chụp xong" thì lấy đủ 4 ảnh từ thư mục', true);
+check('màn phòng KHÔNG hiện trần ảnh cho khách',
+  !(await room.textContent('.counter'))?.includes('/'));
 check('KHÔNG còn nút thêm ảnh tay',
   !(await room.isVisible('button:has-text("Thêm ảnh tay")')));
 

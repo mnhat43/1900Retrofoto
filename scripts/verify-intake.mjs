@@ -141,7 +141,11 @@ for (let i = 0; i < 4; i++) {
   writeFileSync(join(captureRoot, s3.body.code, `C_${i + 1}.jpg`), await jpeg(C[i]));
 }
 await p.click('button:has-text("Lấy thêm ảnh")');
-await p.waitForFunction(() => document.querySelectorAll('.slot.filled').length === 4, { timeout: 15000 })
+// Bo dem chi con MOT so: so anh da chup
+await p.waitForFunction(
+  () => document.querySelector('.counter .big')?.textContent?.trim() === '4',
+  { timeout: 15000 },
+)
   .then(() => check('bấm quét lại: ảnh hiện lên màn hình', true))
   .catch(() => check('bấm quét lại: ảnh hiện lên màn hình', false));
 await p.screenshot({ path: 'scratch/intake-3-loaded.png' });

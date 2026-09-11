@@ -13,6 +13,10 @@ import {
   closeSession, busySession, sessionByAnyToken, openSessionsForRoom,
   LIVE_STATUSES,
 } from './session.ts';
+import {
+  maxPhotosPerSession, setMaxPhotosPerSession, clampMaxPhotos,
+  MAX_PHOTOS_MIN, MAX_PHOTOS_MAX,
+} from './settings.ts';
 import { addPhoto, listPhotos, getPhoto, countPhotos, previewName, CaptureError } from './capture.ts';
 import { saveComposite, listComposites, getBySlug } from './composite.ts';
 import { filePath, readFileFrom } from './storage.ts';
@@ -194,7 +198,17 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
   if (path === '/api/staff/sessions' && method === 'POST') {
     if (requireStaff(ctx)) return true;
     const body = await readJson<{ maxPhotos?: number; note?: string; room?: string }>(req);
-    const maxPhotos = Math.max(1, Math.min(100, Number(body.maxPhotos) || 8));
+    /*
+     * Trần ảnh lấy từ THIẾT LẬP, không phải nhân viên chọn từng phiên —
+     * quán không bán gói theo số kiểu nữa, ảnh chụp được bao nhiêu tính bấy
+     * nhiêu, trần chỉ còn là lưới an toàn.
+     *
+     * Vẫn nhận `maxPhotos` nếu người gọi ghi rõ: các script kiểm chứng cần
+     * đặt trần thấp để thử đúng nhánh "chụp đầy". Giao diện thì không gửi.
+     */
+    const maxPhotos = body.maxPhotos == null
+      ? maxPhotosPerSession()
+      : clampMaxPhotos(body.maxPhotos);
     const roomId = String(body.room ?? '');
 
     if (!CONFIG.rooms.includes(roomId)) {
@@ -229,6 +243,37 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     if (requireStaff(ctx)) return true;
     const ok = closeSession(path.split('/')[4]);
     json(res, ok ? 200 : 409, ok ? { ok: true } : { error: 'Phiên không ở trạng thái đóng được' });
+    return true;
+  }
+
+  // ---- Thiết lập nhân viên đổi được ----
+
+  if (path === '/api/staff/settings' && method === 'GET') {
+    if (requireStaff(ctx)) return true;
+    json(res, 200, {
+      maxPhotosPerSession: maxPhotosPerSession(),
+      maxPhotosMin: MAX_PHOTOS_MIN,
+      maxPhotosMax: MAX_PHOTOS_MAX,
+    });
+    return true;
+  }
+
+  if (path === '/api/staff/settings' && method === 'PATCH') {
+    if (requireStaff(ctx)) return true;
+    const body = await readJson<{ maxPhotosPerSession?: unknown }>(req);
+
+    // Từ chối thẳng thay vì lặng lẽ kẹp về biên: nhân viên gõ nhầm 1000 mà
+    // màn hình báo "đã lưu" rồi hiện 500 thì họ tưởng mình gõ sai chỗ khác.
+    const n = Number(body.maxPhotosPerSession);
+    if (!Number.isFinite(n) || n !== Math.floor(n)
+        || n < MAX_PHOTOS_MIN || n > MAX_PHOTOS_MAX) {
+      json(res, 400, {
+        error: `Số ảnh tối đa phải là số nguyên từ ${MAX_PHOTOS_MIN} đến ${MAX_PHOTOS_MAX}`,
+      });
+      return true;
+    }
+
+    json(res, 200, { maxPhotosPerSession: setMaxPhotosPerSession(n) });
     return true;
   }
 

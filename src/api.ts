@@ -97,13 +97,36 @@ export type RoomStatus = {
 export const staffRooms = () =>
   req<{ rooms: RoomStatus[] }>('/api/staff/rooms');
 
-export const createSession = (room: string, maxPhotos: number) =>
+/**
+ * Tạo phiên cho một phòng.
+ *
+ * Không gửi `maxPhotos`: trần ảnh lấy từ thiết lập chung của quán, nhân viên
+ * không chọn từng phiên nữa (xem `staffSettings`).
+ */
+export const createSession = (room: string) =>
   req<{
     id: string; code: string; maxPhotos: number;
     room: string; captureDir: string | null;
   }>('/api/staff/sessions', {
     method: 'POST',
-    body: JSON.stringify({ room, maxPhotos }),
+    body: JSON.stringify({ room }),
+  });
+
+export type StaffSettings = {
+  /** Trần ảnh áp cho các phiên tạo mới. */
+  maxPhotosPerSession: number;
+  maxPhotosMin: number;
+  maxPhotosMax: number;
+};
+
+export const staffSettings = () => req<StaffSettings>('/api/staff/settings');
+
+/** Trả về giá trị server đã thực sự lưu. */
+export const saveStaffSettings = (maxPhotosPerSession: number) =>
+  req<{ maxPhotosPerSession: number }>('/api/staff/settings', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ maxPhotosPerSession }),
   });
 
 /** Đóng phiên -> phòng rảnh để nhận khách tiếp theo. */

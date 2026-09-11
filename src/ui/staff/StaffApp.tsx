@@ -10,12 +10,11 @@ import FramesPanel from './FramesPanel';
 import ColorPanel from './ColorPanel';
 import StoragePanel from './StoragePanel';
 import QrModal from './QrModal';
+import MaxPhotosSetting from './MaxPhotosSetting';
 import { useDialog } from './useDialog';
 import './staff.css';
 
 type Row = SessionInfo & { photos: number; composites: number };
-
-const PACKAGES = [4, 8, 12, 16, 20];
 
 const STATUS_LABEL: Record<string, string> = {
   created: 'Chờ khách',
@@ -77,7 +76,6 @@ export default function StaffApp() {
   const [rows, setRows] = useState<Row[]>([]);
   const [rooms, setRooms] = useState<RoomStatus[]>([]);
   const [room, setRoom] = useState('');
-  const [maxPhotos, setMaxPhotos] = useState(8);
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
   const [view, setView] = useState<'sessions' | 'frames' | 'colors' | 'storage'>('sessions');
@@ -149,7 +147,7 @@ export default function StaffApp() {
     setBusy(true);
     setError('');
     try {
-      await createSession(room, maxPhotos);
+      await createSession(room);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không tạo được mã');
@@ -349,7 +347,7 @@ export default function StaffApp() {
       </section>
 
       <section className="card">
-        <h2>Tạo gói chụp</h2>
+        <h2>Tạo phiên chụp</h2>
 
         {allBusy ? (
           <p className="warn-box">
@@ -373,25 +371,17 @@ export default function StaffApp() {
               ))}
             </div>
 
-            <label className="field-label">Số kiểu ảnh</label>
-            <div className="pkg-row">
-              {PACKAGES.map((n) => (
-                <button
-                  key={n}
-                  className={n === maxPhotos ? 'pkg on' : 'pkg'}
-                  onClick={() => setMaxPhotos(n)}
-                >
-                  {n} kiểu
-                </button>
-              ))}
-            </div>
-
             {error && <p className="error">{error}</p>}
             <button className="primary" disabled={!room || busy} onClick={onCreate}>
               {busy ? 'Đang tạo...' : room ? `Tạo mã cho phòng ${room}` : 'Chọn phòng trước'}
             </button>
           </>
         )}
+
+        {/* Thiết lập của quán, không phải lựa chọn từng lượt khách — để dưới
+            cùng và chữ nhỏ, đứng ngoài luồng thao tác hằng ngày. Vẫn hiện cả
+            khi mọi phòng đều bận, vì đổi nó không liên quan tới phòng nào. */}
+        <MaxPhotosSetting />
       </section>
 
       </div>
@@ -415,7 +405,10 @@ export default function StaffApp() {
                   <span className={`badge ${s.status}`}>{STATUS_LABEL[s.status] ?? s.status}</span>
                 </td>
                 <td data-label="Phòng">{s.room ?? '—'}</td>
-                <td data-label="Ảnh">{s.photos}/{s.maxPhotos}</td>
+                {/* Chỉ số ảnh ĐÃ chụp. Trần là lưới an toàn của hệ thống,
+                    không phải gói khách mua, nên hiện "8/100" chỉ gây hiểu
+                    nhầm là khách còn 92 kiểu chưa chụp. */}
+                <td data-label="Ảnh">{s.photos}</td>
                 <td data-label="Đã ghép">{s.composites}</td>
                 <td data-label="Bắt đầu">
                   <span className="when">

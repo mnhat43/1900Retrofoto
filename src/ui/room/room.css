@@ -241,8 +241,6 @@ body {
   letter-spacing: -.04em;
 }
 
-.counter .big span { font-size: .42em; color: var(--text-3); }
-
 .counter p {
   margin: 8px 0 0;
   font-size: clamp(15px, 1.6vw, 20px);
@@ -250,42 +248,10 @@ body {
 }
 
 /*
- * Ô đếm ảnh xếp như các khung trên dải phim — ô đã có ảnh sáng lên,
- * ô trống để nét đứt.
+ * Lưới ô đếm ảnh đã bỏ cùng lúc với gói chụp theo số kiểu: không còn con số
+ * "tổng số kiểu" nào để vẽ ô chờ, mà vẽ theo trần an toàn (100) thì vừa vô
+ * nghĩa vừa tràn màn hình. Giờ chỉ còn một con số to duy nhất.
  */
-.thumbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: clamp(6px, 1.2vh, 10px);
-  justify-content: center;
-  max-width: min(760px, 92vw);
-}
-
-.slot {
-  width: clamp(38px, 6.5vh, 58px);
-  height: clamp(38px, 6.5vh, 58px);
-  border: 2px dashed var(--border);
-  border-radius: var(--r-sm);
-  display: grid;
-  place-items: center;
-  color: var(--text-3);
-  font-family: var(--mono);
-  font-size: clamp(13px, 2.2vh, 17px);
-  transition: all .2s;
-}
-
-/*
- * Trên nền sáng, chỉ đổi nền nhạt là không đủ phân biệt với ô trống — phải
- * đảo hẳn: nền accent đặc, chữ trắng. Nhìn từ xa 2-3 mét vẫn đếm được ngay.
- */
-.slot.filled {
-  border-style: solid;
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 700;
-  box-shadow: var(--shadow-sm);
-}
 
 .actions {
   display: flex;

@@ -31,7 +31,6 @@ await staff.fill('input[type=password]', 'test-secret');
 await staff.click('.login button');
 await staff.waitForSelector('.pkg-row');
 await staff.click('.pkg:has-text("Phòng 1")');
-await staff.click('.pkg:has-text("4 kiểu")');
 await staff.click('button.primary:has-text("Tạo mã")');
 // Mã hiện ở thẻ phòng (khối "Mã cho phòng" đã bỏ)
 await staff.waitForSelector('.room-card.busy .room-code');
@@ -69,12 +68,17 @@ const shotDir = join(captureRoot, code);
 mkdirSync(shotDir, { recursive: true });
 for (let i = 0; i < 2; i++) writeFileSync(join(shotDir, `IMG_${i + 1}.jpg`), files[i].buffer);
 await room.click('.btn:has-text("Đã chụp xong")');
-await room.waitForFunction(() => document.querySelectorAll('.slot.filled').length === 2);
+// Bo dem chi con so anh da chup (bo luoi o trong va "x/N")
+await room.waitForFunction(
+  () => document.querySelector('.counter .big')?.textContent?.trim() === '2',
+);
 await shot(room, 'flow-4-room-shooting');
 
 for (let i = 2; i < 4; i++) writeFileSync(join(shotDir, `IMG_${i + 1}.jpg`), files[i].buffer);
 await room.click('.btn:has-text("Quét lại")');
-await room.waitForFunction(() => document.querySelectorAll('.slot.filled').length === 4);
+await room.waitForFunction(
+  () => document.querySelector('.counter .big')?.textContent?.trim() === '4',
+);
 await room.click('.btn:has-text("Hiện mã QR")');
 await room.waitForSelector('.qr-card');
 await shot(room, 'flow-5-room-qr');

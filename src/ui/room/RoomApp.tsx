@@ -178,23 +178,25 @@ export default function RoomApp() {
         <Bar right={<span className="code-chip">{session.code}</span>} />
 
         <div className="room-main">
+          {/*
+            Chỉ hiện SỐ ẢNH ĐÃ CHỤP, không hiện "3/100".
+
+            Quán không bán gói theo số kiểu nữa; trần chỉ còn là lưới an toàn
+            của hệ thống. Chìa con số đó ra cho khách sẽ thành lời hứa hụt —
+            họ đọc "3/100" là tưởng còn 97 kiểu được chụp.
+
+            Cũng vì vậy mà bỏ luôn lưới ô trống: vẽ 100 ô chờ thì vừa vô nghĩa
+            vừa tràn màn hình.
+          */}
           <div className="counter">
-            <div className="big">{photos.length}<span>/{session.maxPhotos}</span></div>
+            <div className="big">{photos.length}</div>
             <p>
               {!hasPhotos
                 ? 'Chụp xong thì bấm nút bên dưới'
                 : remaining > 0
-                  ? `Còn ${remaining} kiểu`
-                  : 'Đã chụp đủ'}
+                  ? `Đã lấy ${photos.length} ảnh`
+                  : 'Đã đạt giới hạn ảnh của phiên'}
             </p>
-          </div>
-
-          <div className="thumbs">
-            {Array.from({ length: session.maxPhotos }, (_, i) => (
-              <div key={i} className={i < photos.length ? 'slot filled' : 'slot'}>
-                {i + 1}
-              </div>
-            ))}
           </div>
 
           {/*
