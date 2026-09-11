@@ -662,40 +662,32 @@ button.primary.danger:hover:not(:disabled) { background: var(--danger); filter: 
 .frames-head h2 { margin: 0 0 4px; }
 
 /*
+ * Hai nút ở đầu trang phải cùng đường chân.
+ * button.primary có margin-top riêng (để dùng dưới các form), nên đặt cạnh
+ * một .ghost là nó tụt xuống một nhịp — phải trung hoà ở đây.
+ */
+.frames-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.frames-head-actions button.primary { margin-top: 0; }
+
+/*
  * Hướng dẫn chuẩn bị file khung. Gập lại chỉ cao một dòng.
  *
  * flex: 0 0 auto để không bị bóp méo. Lúc mở ra thì .frame-list tự co lại và
  * cuộn bên trong nó, nên cả trang vẫn không sinh thanh cuộn — trần max-height
  * ở đây là để phần hướng dẫn không chiếm hết chỗ của thư viện khung.
  */
-.frame-help {
-  flex: 0 0 auto;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  padding: 0 14px;
-  font-size: 13px;
-  /*
-   * Trần cao để khối này không chiếm hết chỗ của thư viện khung, nhưng phải
-   * đủ cho hết nội dung: cắt mất dòng cuối thì nhân viên không biết là còn,
-   * vì khối gập/mở trông như đã hiện đủ.
-   */
-  max-height: 60vh;
-  overflow-y: auto;
-}
+/*
+ * Hướng dẫn nằm trong modal (.modal-inner lo nền, viền, trần cao và cuộn),
+ * nên ở đây chỉ còn chuyện chữ nghĩa và cách chia cột.
+ */
+.frame-help { font-size: 13px; }
 
-.frame-help summary {
-  cursor: pointer;
-  padding: 10px 0;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--accent);
-}
-
-.frame-help[open] summary {
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 10px;
-}
+.frame-help header { margin-bottom: 14px; }
 
 .frame-help p {
   margin: 0 0 9px;
@@ -722,7 +714,6 @@ button.primary.danger:hover:not(:disabled) { background: var(--danger); filter: 
 
 .frame-help b { color: var(--text-1); }
 
-.frame-help-body { padding-bottom: 12px; }
 
 /* Câu chốt đặt trên cùng, đậm hơn phần còn lại vì nó là điều kiện bắt buộc */
 .frame-help-lead {
@@ -877,14 +868,22 @@ button.link.danger { color: var(--danger); }
  * `stretch` để hai cột cao bằng nhau — nhờ đó nút Lưu/Huỷ tụt xuống ngang mép
  * dưới của ảnh chứ không lửng lơ giữa thẻ.
  */
+/* Modal khung mới: hẹp hơn trần 880px của .modal-inner cho đỡ loãng */
+.frame-modal { max-width: 720px; }
+
+/*
+ * Hai cột: ảnh bên trái, các trường bên phải.
+ *
+ * align-items: start chứ KHÔNG stretch. Khung dải dọc cao gấp ba bề rộng nên
+ * cột ảnh luôn cao hơn cột chữ; cho cột chữ giãn theo thì mọi thứ trong nó bị
+ * đẩy dàn ra giữa khoảng trắng. Để start thì các trường nằm gọn trên đầu, và
+ * khoảng trống dồn xuống dưới — nơi không ai để ý.
+ */
 .frame-preview {
-  flex: 0 0 auto;
-  width: fit-content;
-  max-width: 100%;
   display: grid;
-  grid-template-columns: minmax(200px, 360px) minmax(240px, 380px);
-  gap: clamp(16px, 2.5vw, 28px);
-  align-items: stretch;
+  grid-template-columns: minmax(180px, 300px) minmax(240px, 1fr);
+  gap: clamp(16px, 2.5vw, 26px);
+  align-items: start;
 }
 
 /*
@@ -915,8 +914,8 @@ button.link.danger { color: var(--danger); }
   display: block;
   width: auto;
   height: auto;
-  max-height: clamp(240px, 42vh, 400px);
-  max-width: min(360px, 32vw);
+  max-height: clamp(220px, 38vh, 360px);
+  max-width: min(300px, 30vw);
 }
 
 /* ---------- Nắn ô bằng chuột ---------- */
@@ -1089,28 +1088,35 @@ button.link.danger { color: var(--danger); }
 }
 
 /*
- * Thanh hành động TRẢI NGANG CẢ HAI CỘT của thẻ.
+ * Thanh nút là FOOTER của modal, tách bằng đường kẻ.
  *
- * Trước đây nút nằm trong cột phải với margin-top:auto để dạt xuống đáy cột.
- * Nhưng cột ảnh cao hơn cột chữ rất nhiều (khung dải dọc cao gấp ba bề rộng),
- * nên nút bị đẩy xuống tận đáy và lửng lơ giữa một khoảng trắng 250px, cách
- * xa cái ô Tên khung mà nó xác nhận.
- *
- * Trải ngang thì nút luôn ở đúng một chỗ bất kể ảnh cao bao nhiêu, và đường
- * kẻ trên tách bạch "phần xem và sửa" với "phần quyết định".
+ * Hai nút phải CÂN NHAU: button.primary có min-height theo vh và margin-top
+ * riêng, còn button.ghost thì min-height cố định 40px và không margin — đặt
+ * cạnh nhau là lệch cả chiều cao lẫn đường chân. Ép cùng một cỡ ở đây, giống
+ * cách .dialog-actions đã làm cho các hộp thoại khác.
  */
 .preview-actions {
-  grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
-  margin-top: 4px;
-  padding-top: 14px;
+  margin-top: 18px;
+  padding-top: 16px;
   border-top: 1px solid var(--border);
 }
 
-.preview-actions .primary { flex: 0 0 auto; min-width: 150px; }
+/*
+ * Ép CHIỀU CAO CỐ ĐỊNH, không chỉ min-height: button.primary còn có padding
+ * dọc riêng theo vh, nên đặt min-height bằng nhau thì nó vẫn cao hơn .ghost
+ * 4px và hai nút không cùng đường chân.
+ */
+.preview-actions button {
+  margin-top: 0;
+  height: 44px;
+  min-height: 0;
+  padding-block: 0;
+  min-width: 130px;
+}
 
 /* Màn hẹp: xếp dọc, ảnh và thẻ ăn hết bề ngang */
 @media (max-width: 760px) {

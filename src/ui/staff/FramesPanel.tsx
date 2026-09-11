@@ -31,6 +31,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 export default function FramesPanel() {
   const [frames, setFrames] = useState<ApiFrame[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
@@ -174,7 +175,7 @@ export default function FramesPanel() {
             {frames.length} khung · {enabledCount} đang cho khách chọn
           </p>
         </div>
-        <div>
+        <div className="frames-head-actions">
           {/*
             CHỈ các định dạng giữ được vùng trong suốt. KHÔNG có JPG: định
             dạng đó không lưu được độ trong suốt, mà cả cơ chế khung dựa vào
@@ -188,6 +189,9 @@ export default function FramesPanel() {
             hidden
             onChange={(e) => onPick(e.target.files?.[0])}
           />
+          <button className="ghost" onClick={() => setHelpOpen(true)}>
+            Cách chuẩn bị file
+          </button>
           <button className="primary" disabled={!!busy}
             onClick={() => fileInput.current?.click()}>
             {busy || '+ Tải khung lên'}
@@ -196,87 +200,96 @@ export default function FramesPanel() {
       </div>
 
       {/*
-        Hướng dẫn chuẩn bị file, đặt NGAY DƯỚI nút tải lên.
-        Gập sẵn: ai làm đúng rồi thì không phải đọc lại mỗi lần, còn lúc vướng
-        thì không phải đi tìm ở chỗ khác. Dùng <details> nên không cần state,
-        và vẫn gập/mở được kể cả khi JS có lỗi.
+        Hướng dẫn để trong MODAL, không phải khối gập/mở giữa trang.
+
+        Để giữa trang thì lúc mở nó ăn hết chiều cao còn lại và thư viện khung
+        chỉ còn ~110px. Mà thư viện là vùng duy nhất cuộn được, nên coi như
+        mất luôn đường xem các khung phía dưới.
       */}
-      <details className="frame-help">
-        <summary>Cách chuẩn bị file khung ảnh</summary>
+      {helpOpen && (
+        <div className="modal" onClick={() => setHelpOpen(false)}>
+          <div
+            className="modal-inner frame-help"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header>
+              <h2>Cách chuẩn bị file khung ảnh</h2>
+              <button className="ghost" onClick={() => setHelpOpen(false)}>
+                Đóng
+              </button>
+            </header>
 
-        <div className="frame-help-body">
-          {/*
-            Phần mở đầu trải ngang cả khối, không nhét vào cột.
-            Đây là đoạn dài nhất, mà cột chỉ rộng ~310px nên nhét vào cột thì
-            nó xuống dòng sáu lần và đẩy cả khối cao thêm ~60px — đủ để dòng
-            cuối bị cắt mất ở màn 1024x700.
-          */}
-          <p className="frame-help-lead">
-            Khung ảnh <b>không phải một tấm ảnh kín</b> — nó là tấm{' '}
-            <b>có lỗ</b>. Hoa văn, chữ, viền nằm ở ngoài; chỗ để ảnh khách hiện
-            ra phải <b>trống rỗng</b>, tức là <b>nền trong suốt</b>.
-          </p>
-          <p className="frame-help-lead2">
-            Chỗ hay nhầm: <b>“trong suốt” khác “màu trắng”</b> — trắng vẫn là
-            một màu, vẫn phủ kín. Nên đuôi <b>.png</b> cũng chưa chắc đúng: lúc
-            xuất mà quên tắt nền thì bạn được file .png nền trắng bịt kín, và
-            phần mềm sẽ từ chối y như JPG.
-          </p>
+            {/*
+              Phần mở đầu trải ngang cả khối, không nhét vào cột: đây là đoạn
+              dài nhất, nhét vào cột hẹp thì nó xuống dòng sáu lần.
+            */}
+            <p className="frame-help-lead">
+              Khung ảnh <b>không phải một tấm ảnh kín</b> — nó là tấm{' '}
+              <b>có lỗ</b>. Hoa văn, chữ, viền nằm ở ngoài; chỗ để ảnh khách
+              hiện ra phải <b>trống rỗng</b>, tức là <b>nền trong suốt</b>.
+            </p>
+            <p className="frame-help-lead2">
+              Chỗ hay nhầm: <b>“trong suốt” khác “màu trắng”</b> — trắng vẫn là
+              một màu, vẫn phủ kín. Nên đuôi <b>.png</b> cũng chưa chắc đúng:
+              lúc xuất mà quên tắt nền thì bạn được file .png nền trắng bịt
+              kín, và phần mềm sẽ từ chối y như JPG.
+            </p>
 
-          <div className="frame-help-cols">
-            <section>
-              <h4>Nhận file gì</h4>
-              <p>
-                <b>PNG, WebP, AVIF, GIF</b> — miễn là file còn giữ vùng trong
-                suốt. Phần mềm tự dò ra các lỗ và đánh số sẵn cho bạn.
-              </p>
-              <p className="frame-help-no">
-                <b>Không nhận JPG.</b> Không phải do phần mềm chặn, mà do định
-                dạng JPG không lưu được vùng trong suốt — file JPG luôn đặc kín
-                nên không có lỗ nào.
-              </p>
-            </section>
+            <div className="frame-help-cols">
+              <section>
+                <h4>Nhận file gì</h4>
+                <p>
+                  <b>PNG, WebP, AVIF, GIF</b> — miễn là file còn giữ vùng trong
+                  suốt. Phần mềm tự dò ra các lỗ và đánh số sẵn cho bạn.
+                </p>
+                <p className="frame-help-no">
+                  <b>Không nhận JPG.</b> Không phải do phần mềm chặn, mà do
+                  định dạng JPG không lưu được vùng trong suốt — file JPG luôn
+                  đặc kín nên không có lỗ nào.
+                </p>
+              </section>
 
-            <section>
-              <h4>Xuất file cho đúng</h4>
-              <ul>
-                <li>
-                  <b>Canva:</b> Share → Download → PNG → tick{' '}
-                  <b>Transparent background</b> (cần Canva Pro)
-                </li>
-                <li><b>Figma:</b> xoá Fill của frame → Export → PNG</li>
-                <li>
-                  <b>Photoshop:</b> xoá layer Background → File → Export As →
-                  PNG → tick <b>Transparency</b>
-                </li>
-                <li>
-                  <b>Illustrator:</b> File → Export As → PNG → Background:{' '}
-                  <b>Transparent</b>
-                </li>
-              </ul>
-            </section>
+              <section>
+                <h4>Xuất file cho đúng</h4>
+                <ul>
+                  <li>
+                    <b>Canva:</b> Share → Download → PNG → tick{' '}
+                    <b>Transparent background</b> (cần Canva Pro)
+                  </li>
+                  <li><b>Figma:</b> xoá Fill của frame → Export → PNG</li>
+                  <li>
+                    <b>Photoshop:</b> xoá layer Background → File → Export As →
+                    PNG → tick <b>Transparency</b>
+                  </li>
+                  <li>
+                    <b>Illustrator:</b> File → Export As → PNG → Background:{' '}
+                    <b>Transparent</b>
+                  </li>
+                </ul>
+              </section>
 
-            <section>
-              <h4>Kích thước nên xuất (300 DPI)</h4>
-              <ul>
-                <li>Dải dọc 3–4 ô · khổ 2×6 inch → <b>600 × 1800 px</b></li>
-                <li>Tờ 6 ô · khổ 4×6 inch → <b>1200 × 1800 px</b></li>
-                <li>Tờ vuông 9 ô · khổ 6×6 inch → <b>1800 × 1800 px</b></li>
-              </ul>
-              <p className="muted small">
-                Xuất to hơn vẫn tốt. Nhỏ hơn thì in ra rỗ.
-              </p>
-            </section>
+              <section>
+                <h4>Kích thước nên xuất (300 DPI)</h4>
+                <ul>
+                  <li>Dải dọc 3–4 ô · khổ 2×6 inch → <b>600 × 1800 px</b></li>
+                  <li>Tờ 6 ô · khổ 4×6 inch → <b>1200 × 1800 px</b></li>
+                  <li>Tờ vuông 9 ô · khổ 6×6 inch → <b>1800 × 1800 px</b></li>
+                </ul>
+                <p className="muted small">
+                  Xuất to hơn vẫn tốt. Nhỏ hơn thì in ra rỗ.
+                </p>
+              </section>
+            </div>
+
+            <p className="frame-help-kiem">
+              <b>Cách kiểm nhanh:</b> mở file trong phần mềm thiết kế, chỗ đặt
+              ảnh khách phải hiện ra <b>ô caro</b> — giống hoa văn phía sau các
+              khung trong thư viện. Thấy ô caro là đúng; thấy màu trắng phẳng
+              là chưa được.
+            </p>
           </div>
-
-          <p className="frame-help-kiem">
-            <b>Cách kiểm nhanh:</b> mở file trong phần mềm thiết kế, chỗ đặt
-            ảnh khách phải hiện ra <b>ô caro</b> — giống hoa văn phía sau các
-            khung trong thư viện dưới đây. Thấy ô caro là đúng; thấy màu trắng
-            phẳng là chưa được.
-          </p>
         </div>
-      </details>
+      )}
 
       {error && <p className="error">{error}</p>}
 
@@ -286,99 +299,120 @@ export default function FramesPanel() {
         </p>
       )}
 
-      {/* Xem trước kết quả dò trước khi lưu */}
+      {/*
+        Xem trước kết quả dò trước khi lưu — trong MODAL.
+        Để inline giữa trang thì thẻ này cao hơn cả vùng còn lại, đẩy thư viện
+        khung ra khỏi màn mà không có gì cuộn được.
+
+        KHÔNG đóng khi bấm nền: một cú bấm chệch là mất cả tên vừa gõ và các ô
+        vừa nắn. Chỉ nút Huỷ mới đóng.
+      */}
       {pending && (
-        <div className="frame-preview card">
-          <SlotEditor
-            src={pending.url}
-            slots={pending.analysis.slots}
-            onChange={(slots) => setPending({
-              ...pending,
-              analysis: { ...pending.analysis, slots },
-            })}
-          />
+        <div className="modal">
+          <div className="modal-inner frame-modal">
+            <header>
+              <h2>Khung mới</h2>
+            </header>
 
-          <div className="preview-info">
-            <label className="field-label">Tên khung</label>
-            <input
-              className="text-input"
-              value={pending.label}
-              onChange={(e) => setPending({ ...pending, label: e.target.value })}
-            />
+            <div className="frame-preview">
+              <SlotEditor
+                src={pending.url}
+                slots={pending.analysis.slots}
+                onChange={(slots) => setPending({
+                  ...pending,
+                  analysis: { ...pending.analysis, slots },
+                })}
+              />
 
-            <label className="field-label">Khổ in (inch)</label>
-            <div className="size-row">
-              <input
-                className="text-input" type="number" step="0.25"
-                min={MIN_INCH} max={MAX_INCH}
-                value={pending.analysis.widthInch}
-                onChange={(e) => setInch('widthInch', Number(e.target.value))}
-              />
-              <span>×</span>
-              <input
-                className="text-input" type="number" step="0.25"
-                min={MIN_INCH} max={MAX_INCH}
-                value={pending.analysis.heightInch}
-                onChange={(e) => setInch('heightInch', Number(e.target.value))}
-              />
-              <button
-                type="button"
-                className="link"
-                title="Tính lại chiều còn lại cho khớp tỉ lệ file"
-                onClick={fitRatio}
-              >
-                Khớp tỉ lệ
-              </button>
+              <div className="preview-info">
+                <label className="field-label">Tên khung</label>
+                <input
+                  className="text-input"
+                  value={pending.label}
+                  onChange={(e) => setPending({ ...pending, label: e.target.value })}
+                />
+
+                <label className="field-label">Khổ in (inch)</label>
+                <div className="size-row">
+                  <input
+                    className="text-input" type="number" step="0.25"
+                    min={MIN_INCH} max={MAX_INCH}
+                    value={pending.analysis.widthInch}
+                    onChange={(e) => setInch('widthInch', Number(e.target.value))}
+                  />
+                  <span>×</span>
+                  <input
+                    className="text-input" type="number" step="0.25"
+                    min={MIN_INCH} max={MAX_INCH}
+                    value={pending.analysis.heightInch}
+                    onChange={(e) => setInch('heightInch', Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="link"
+                    title="Tính lại chiều còn lại cho khớp tỉ lệ file"
+                    onClick={fitRatio}
+                  >
+                    Khớp tỉ lệ
+                  </button>
+                </div>
+
+                {/* Tỉ lệ khai khác tỉ lệ file -> in ra sẽ méo. Phải nói trước. */}
+                {ratioOff && (
+                  <p className="warn-box small">
+                    Tỉ lệ khổ in khác tỉ lệ file ảnh — in ra ảnh sẽ bị kéo méo.
+                    Bấm “Khớp tỉ lệ” để sửa.
+                  </p>
+                )}
+
+                <p className="muted small">
+                  File {pending.analysis.width}×{pending.analysis.height}px · xuất ra{' '}
+                  {Math.round(pending.analysis.widthInch * 300)}×
+                  {Math.round(pending.analysis.heightInch * 300)}px ở 300 DPI.
+                </p>
+                <p className="muted small">
+                  Kiểm tra các ô đánh số có trùng lỗ trên khung không rồi hãy lưu.
+                </p>
+
+                {pending.analysis.slots.length === 0 && (
+                  <p className="warn-box small">
+                    Chưa có ô nào — khách sẽ không có chỗ đặt ảnh. Kéo trên ảnh để
+                    vẽ lại ô.
+                  </p>
+                )}
+
+              </div>
+
+              {/*
+                Thanh hành động trải ngang CẢ HAI CỘT, không nhét vào cột phải.
+                Cột ảnh cao hơn cột chữ nhiều (khung dải dọc cao gấp ba bề rộng),
+                nên nút nằm trong cột phải thì bị đẩy xuống đáy cột và lửng lơ
+                giữa một khoảng trắng lớn. Trải ngang thì nút luôn ở đúng một chỗ,
+                và thứ tự đọc thành: xem ảnh -> điền tên -> bấm lưu.
+              */}
             </div>
 
-            {/* Tỉ lệ khai khác tỉ lệ file -> in ra sẽ méo. Phải nói trước. */}
-            {ratioOff && (
-              <p className="warn-box small">
-                Tỉ lệ khổ in khác tỉ lệ file ảnh — in ra ảnh sẽ bị kéo méo.
-                Bấm “Khớp tỉ lệ” để sửa.
-              </p>
-            )}
-
-            <p className="muted small">
-              File {pending.analysis.width}×{pending.analysis.height}px · xuất ra{' '}
-              {Math.round(pending.analysis.widthInch * 300)}×
-              {Math.round(pending.analysis.heightInch * 300)}px ở 300 DPI.
-            </p>
-            <p className="muted small">
-              Kiểm tra các ô đánh số có trùng lỗ trên khung không rồi hãy lưu.
-            </p>
-
-            {pending.analysis.slots.length === 0 && (
-              <p className="warn-box small">
-                Chưa có ô nào — khách sẽ không có chỗ đặt ảnh. Kéo trên ảnh để
-                vẽ lại ô.
-              </p>
-            )}
-
-          </div>
-
-          {/*
-            Thanh hành động trải ngang CẢ HAI CỘT, không nhét vào cột phải.
-            Cột ảnh cao hơn cột chữ nhiều (khung dải dọc cao gấp ba bề rộng),
-            nên nút nằm trong cột phải thì bị đẩy xuống đáy cột và lửng lơ
-            giữa một khoảng trắng lớn. Trải ngang thì nút luôn ở đúng một chỗ,
-            và thứ tự đọc thành: xem ảnh -> điền tên -> bấm lưu.
-          */}
-          <div className="preview-actions">
-            <button className="ghost" disabled={!!busy} onClick={() => {
-              URL.revokeObjectURL(pending.url);
-              setPending(null);
-            }}>
-              Huỷ
-            </button>
-            <button
-              className="primary"
-              disabled={!!busy || !pending.label.trim()
-                || pending.analysis.slots.length === 0}
-              onClick={onSave}
-            >
-              {busy || 'Lưu khung'}
-            </button>
+            {/*
+              Thanh nút là FOOTER của modal, tách bằng đường kẻ.
+              Dùng lại quy ước .dialog-actions của app: Huỷ bên trái, hành
+              động chính bên phải, cùng cỡ và cùng đường chân.
+            */}
+            <div className="preview-actions">
+              <button className="ghost" disabled={!!busy} onClick={() => {
+                URL.revokeObjectURL(pending.url);
+                setPending(null);
+              }}>
+                Huỷ
+              </button>
+              <button
+                className="primary"
+                disabled={!!busy || !pending.label.trim()
+                  || pending.analysis.slots.length === 0}
+                onClick={onSave}
+              >
+                {busy || 'Lưu khung'}
+              </button>
+            </div>
           </div>
         </div>
       )}

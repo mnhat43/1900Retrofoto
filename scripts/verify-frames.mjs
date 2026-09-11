@@ -322,10 +322,27 @@ check('nắn ô: bấm Huỷ thì không lưu gì',
  */
 console.log('\n--- Huong dan va bo cuc ---');
 
-check('có khối hướng dẫn chuẩn bị file khung',
-  (await sp.locator('.frame-help summary').count()) === 1);
-await sp.click('.frame-help summary');
+/*
+ * Huong dan va the tai khung deu la MODAL.
+ *
+ * De inline giua trang thi moi lan mo, thu vien khung chi con ~110px - ma no
+ * la vung duy nhat cuon duoc, nen coi nhu mat duong xem cac khung con lai.
+ * Kiem bang so do that: chieu cao thu vien KHONG doi khi mo modal.
+ */
+const caoList = () => sp.locator('.frame-list')
+  .evaluate((e) => Math.round(e.getBoundingClientRect().height));
+const listTruoc = await caoList();
+
+check('có nút mở hướng dẫn ở đầu trang',
+  (await sp.locator('.frames-head-actions button.ghost').count()) === 1);
+await sp.click('.frames-head-actions button.ghost');
+await sp.waitForSelector('.frame-help', { timeout: 10000 });
 await sp.waitForTimeout(200);
+check('hướng dẫn mở ra dạng modal', (await sp.locator('.modal .frame-help').count()) === 1);
+check('mở hướng dẫn KHÔNG bóp thư viện khung',
+  (await caoList()) === listTruoc, `${listTruoc}px -> ${await caoList()}px`);
+check('hướng dẫn hiện đủ, không bị cắt bên trong',
+  (await sp.locator('.frame-help').evaluate((e) => e.scrollHeight <= e.clientHeight + 1)));
 const hd = (await sp.locator('.frame-help').textContent()) ?? '';
 check('hướng dẫn nói rõ trong suốt khác màu trắng',
   /trống rỗng/.test(hd) && /màu trắng/.test(hd));
@@ -334,7 +351,7 @@ check('hướng dẫn có cách xuất file và kích thước cần xuất',
   /Canva/.test(hd) && /600 × 1800/.test(hd));
 check('hướng dẫn KHÔNG còn nhắc tới ảnh đặc tự đặt ô',
   !/tự vẽ ô|khoét thủng|xếp nhanh/.test(hd));
-await sp.click('.frame-help summary');
+await sp.click('.frame-help header button');
 await sp.waitForTimeout(150);
 
 // Hop chon file khong duoc moi JPG vao: chon roi nhan loi la to cong
@@ -352,34 +369,40 @@ check('vẫn còn nút Hoàn tác',
   (await sp.locator('.se-head button:has-text("Hoàn tác")').count()) === 1);
 
 /*
- * Thanh hanh dong phai TRAI NGANG ca the va nam duoi cung.
+ * Thanh nut la FOOTER cua modal, va hai nut phai CAN NHAU.
  *
- * Truoc day nut nam trong cot phai voi margin-top:auto, nen anh dai doc cao
- * bao nhieu thi nut bi day xuong va lung lo giua khoang trang bay nhieu.
+ * button.primary co min-height theo vh va margin-top rieng, button.ghost thi
+ * min-height co dinh va khong margin - de nguyen la lech ca chieu cao lan
+ * duong chan. Do bang pixel that, vi mat thuong rat de bo qua 4px.
  */
 const bo = await sp.evaluate(() => {
-  const the = document.querySelector('.frame-preview').getBoundingClientRect();
   const tt = document.querySelector('.preview-info').getBoundingClientRect();
   const th = document.querySelector('.preview-actions').getBoundingClientRect();
   const anh = document.querySelector('.preview-img').getBoundingClientRect();
+  const b = [...document.querySelectorAll('.preview-actions button')];
+  const r = b.map((e) => e.getBoundingClientRect());
   return {
     trongCotPhai: document.querySelector('.preview-info .preview-actions') !== null,
-    rongGanBangThe: th.width / the.width,
     duoiCaAnhVaChu: th.top >= anh.bottom - 1 && th.top >= tt.bottom - 1,
-    hoLonDuoiChu: th.top - tt.bottom,
+    ten: b.map((e) => e.textContent.trim()),
+    lechCao: Math.abs(r[0].height - r[1].height),
+    lechChan: Math.abs(r[0].bottom - r[1].bottom),
+    lechRong: Math.abs(r[0].width - r[1].width),
   };
 });
 check('thanh nút KHÔNG còn nằm trong cột phải', bo.trongCotPhai === false);
-check('thanh nút trải ngang cả thẻ', bo.rongGanBangThe > 0.85,
-  `${(bo.rongGanBangThe * 100).toFixed(0)}% bề ngang thẻ`);
 check('thanh nút nằm dưới cả ảnh và cột chữ', bo.duoiCaAnhVaChu);
-
-const nut = await sp.evaluate(() => {
-  const b = [...document.querySelectorAll('.preview-actions button')];
-  return b.map((e) => e.textContent.trim());
-});
+check('hai nút cao bằng nhau', bo.lechCao < 1, `lệch ${bo.lechCao.toFixed(1)}px`);
+check('hai nút cùng đường chân', bo.lechChan < 1, `lệch ${bo.lechChan.toFixed(1)}px`);
+check('hai nút rộng bằng nhau', bo.lechRong < 1, `lệch ${bo.lechRong.toFixed(1)}px`);
 check('thứ tự nút: Huỷ rồi Lưu khung',
-  nut[0] === 'Huỷ' && nut[1] === 'Lưu khung', nut.join(' | '));
+  bo.ten[0] === 'Huỷ' && bo.ten[1] === 'Lưu khung', bo.ten.join(' | '));
+
+// The tai khung cung phai la modal, va cung khong duoc bop thu vien
+check('thẻ tải khung mở ra dạng modal',
+  (await sp.locator('.modal .frame-modal').count()) === 1);
+check('mở thẻ tải khung KHÔNG bóp thư viện khung',
+  (await caoList()) === listTruoc, `${listTruoc}px -> ${await caoList()}px`);
 
 await sp.click('.preview-actions .ghost');
 await sp.waitForTimeout(300);
