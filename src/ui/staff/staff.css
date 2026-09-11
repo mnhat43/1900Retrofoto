@@ -661,6 +661,64 @@ button.primary.danger:hover:not(:disabled) { background: var(--danger); filter: 
 
 .frames-head h2 { margin: 0 0 4px; }
 
+/*
+ * Hướng dẫn chuẩn bị file khung. Gập lại chỉ cao một dòng.
+ *
+ * flex: 0 0 auto để không bị bóp méo. Lúc mở ra thì .frame-list tự co lại và
+ * cuộn bên trong nó, nên cả trang vẫn không sinh thanh cuộn — trần max-height
+ * ở đây là để phần hướng dẫn không chiếm hết chỗ của thư viện khung.
+ */
+.frame-help {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  padding: 0 14px;
+  font-size: 13px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.frame-help summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.frame-help[open] summary {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+
+.frame-help p {
+  margin: 0 0 9px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.frame-help h4 {
+  margin: 14px 0 5px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+
+.frame-help ul {
+  margin: 0 0 9px;
+  padding-left: 18px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.frame-help li { margin-bottom: 4px; }
+
+.frame-help b { color: var(--text-1); }
+
+.frame-help > :last-child { margin-bottom: 12px; }
+
 .frame-list {
   flex: 1 1 0;
   min-height: 0;
@@ -916,6 +974,47 @@ button.link.danger { color: var(--danger); }
 .se-chip:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.se-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+  border-color: var(--border);
+  color: var(--text-2);
+}
+
+/* Vạch ngăn hai nhóm nút trên thanh công cụ */
+.se-chia {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin-inline: 2px;
+}
+
+/*
+ * ẢNH ĐẶC: vẽ ô thành LỖ CARO chứ không phải khung ngắm.
+ *
+ * Ô caro là quy ước chung cho "chỗ này trong suốt" (Photoshop, Figma, và cả
+ * ảnh khung trong thư viện ngay phía dưới đều vẽ vậy), nên không cần giải
+ * thích thêm. Cái được thật sự là nó CHE ĐÚNG phần hoa văn sắp bị khoét mất:
+ * kéo ô chờm lên viền là thấy viền biến mất ngay, thay vì phát hiện sau khi
+ * đã lưu và khách đã nhận ảnh.
+ *
+ * Dùng lại đúng hoa văn caro của .preview-img và ảnh khung, để hai chỗ nói
+ * cùng một thứ tiếng.
+ */
+.se-box.se-duc .slot-box {
+  background:
+    repeating-conic-gradient(#b9b3c4 0 25%, #8f8899 0 50%)
+    0 0 / 12px 12px;
+  border-style: solid;
+}
+
+.se-box.se-duc .slot-box.on {
+  background:
+    repeating-conic-gradient(#c8c2d2 0 25%, #9d95a8 0 50%)
+    0 0 / 12px 12px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 /*

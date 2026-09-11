@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 
-export type Rect = { x: number; y: number; w: number; h: number };
+import {
+  type Rect, BUOC_VIEN, MIN_SIZE, clamp01, coNoi, xepLuoi,
+} from './slots';
 
 /**
  * Đặt các ô chứa ảnh khách lên khung.
@@ -12,54 +14,11 @@ export type Rect = { x: number; y: number; w: number; h: number };
  *     viên tự đặt. Lúc lưu, server khoét lỗ trong suốt theo đúng các ô này.
  *
  * Vì đường thứ hai bắt đầu từ con số không nên màn này phải tự làm được việc
- * đó cho nhanh: có nút xếp lưới sẵn, chứ kéo tay từng ô cho đều nhau thì rất
- * cực và không bao giờ thẳng hàng.
+ * đó cho nhanh: có nút xếp lưới sẵn và nút chừa viền, chứ kéo tay từng ô cho
+ * đều nhau thì rất cực và không bao giờ thẳng hàng.
  *
- * Toạ độ luôn CHUẨN HOÁ 0..1 — giống hệt thứ server lưu và phần render dùng,
- * nên kéo trên ảnh xem trước bao nhiêu pixel cũng không quan trọng.
+ * Phần tính toán ô nằm ở ./slots — ở đây chỉ còn chuyện chuột và cách vẽ.
  */
-
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-
-/** Ô nhỏ hơn mức này coi như bấm nhầm, không cho tạo. */
-const MIN_SIZE = 0.02;
-
-/** Lề quanh mép khung và khe giữa các ô khi xếp lưới, theo tỉ lệ ảnh. */
-const LE = 0.06;
-const KHE = 0.03;
-
-/**
- * Xếp n ô thành lưới đều nhau.
- *
- * Số cột chọn theo cách khung ảnh thật hay được bố trí: dải dọc xếp một cột,
- * 4 ô thành 2x2, 6 ô thành 2x3, 9 ô thành 3x3. Nhân viên kéo lại được hết,
- * đây chỉ là điểm bắt đầu đỡ phải căn tay.
- */
-function xepLuoi(n: number, tiLe: number): Rect[] {
-  // Khung cao hơn rộng nhiều (dải 2x6) thì xếp một cột cho giống khung thật
-  const cot = tiLe < 0.5 ? 1
-    : n <= 2 ? 1
-      : n <= 4 ? 2
-        : n <= 6 ? 2
-          : 3;
-  const hang = Math.ceil(n / cot);
-
-  const wO = (1 - LE * 2 - KHE * (cot - 1)) / cot;
-  const hO = (1 - LE * 2 - KHE * (hang - 1)) / hang;
-
-  const out: Rect[] = [];
-  for (let i = 0; i < n; i++) {
-    const c = i % cot;
-    const r = Math.floor(i / cot);
-    out.push({
-      x: LE + c * (wO + KHE),
-      y: LE + r * (hO + KHE),
-      w: wO,
-      h: hO,
-    });
-  }
-  return out;
-}
 
 type Drag =
   | { mode: 'move'; i: number; dx: number; dy: number }
@@ -67,13 +26,22 @@ type Drag =
   | { mode: 'draw'; i: number; x0: number; y0: number };
 
 export default function SlotEditor({
-  src, slots, onChange, ratio = 1,
+  src, slots, onChange, ratio = 1, duc = false,
 }: {
   src: string;
   slots: Rect[];
   onChange: (slots: Rect[]) => void;
   /** Bề rộng / chiều cao của file ảnh — quyết định lưới dựng ra mấy cột. */
   ratio?: number;
+  /**
+   * Ảnh đặc: lúc lưu server sẽ KHOÉT THỦNG đúng các ô này.
+   *
+   * Đổi cách VẼ ô chứ không chỉ để hiện thêm chữ. Với ảnh đặc, ô không phải
+   * cái khung ngắm mà là vết cắt, nên vẽ nó thành lỗ caro: kéo ô chờm lên
+   * viền là thấy hoa văn biến mất ngay trước mắt. Nét đứt hồng không nói ra
+   * được điều đó, và nhân viên chỉ phát hiện sau khi đã lưu.
+   */
+  duc?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -178,6 +146,33 @@ export default function SlotEditor({
             {n}
           </button>
         ))}
+
+        {/*
+          Chừa viền: co/nới đồng loạt. Sau khi xếp lưới thì đây là nút hay
+          dùng nhất — lưới xếp sẵn chừa lề 6%, khung nào viền dày hơn thế thì
+          bấm co vài nhịp là hoa văn hiện lại đủ.
+        */}
+        <span className="se-chia" aria-hidden="true" />
+        <span className="muted small">Chừa viền</span>
+        <button
+          type="button"
+          className="se-chip"
+          disabled={!slots.length}
+          onClick={() => apply(coNoi(slots, -BUOC_VIEN))}
+          title="Thu nhỏ tất cả ô để chừa thêm viền"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          className="se-chip"
+          disabled={!slots.length}
+          onClick={() => apply(coNoi(slots, BUOC_VIEN))}
+          title="Nới rộng tất cả ô"
+        >
+          +
+        </button>
+
         <button
           type="button"
           className="link"
@@ -195,7 +190,7 @@ export default function SlotEditor({
       </div>
 
       <div
-        className="preview-img se-box"
+        className={duc ? 'preview-img se-box se-duc' : 'preview-img se-box'}
         ref={box}
         onPointerDown={onDown}
         onPointerMove={onMove}
@@ -251,7 +246,9 @@ export default function SlotEditor({
 
       <p className="se-hint muted small">
         Kéo ô để di chuyển · kéo góc để đổi cỡ · kéo trên nền để thêm ô.
-        Ô là chỗ ảnh khách hiện ra.
+        {duc
+          ? ' Vùng caro là lỗ sắp khoét — hoa văn nằm trong đó sẽ mất.'
+          : ' Ô là chỗ ảnh khách hiện ra.'}
       </p>
 
       {/*

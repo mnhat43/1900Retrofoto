@@ -340,6 +340,92 @@ await sp.waitForTimeout(400);
 check('nắn ô: bấm Huỷ thì không lưu gì',
   (await sp.locator('.frame-preview').count()) === 0);
 
+/*
+ * ẢNH ĐẶC TRÊN GIAO DIỆN.
+ *
+ * Với ảnh đặc, ô không phải cái khung ngắm mà là VẾT CẮT: lưu xong là hoa văn
+ * trong lòng ô mất thật. Nên màn này phải vẽ ô thành lỗ caro, và phải có nút
+ * chừa viền — đó là hai thứ cho nhân viên thấy trước hậu quả, thay vì phát
+ * hiện sau khi khách đã nhận ảnh.
+ */
+console.log('\n--- Ảnh đặc trên giao diện ---');
+
+check('có khối hướng dẫn chuẩn bị file khung',
+  (await sp.locator('.frame-help summary').count()) === 1);
+await sp.click('.frame-help summary');
+await sp.waitForTimeout(200);
+const hd = (await sp.locator('.frame-help').textContent()) ?? '';
+check('hướng dẫn nói rõ trong suốt khác màu trắng',
+  /trống rỗng/.test(hd) && /màu trắng/.test(hd));
+check('hướng dẫn có cách xuất file và kích thước cần xuất',
+  /Canva/.test(hd) && /600 × 1800/.test(hd));
+await sp.click('.frame-help summary');
+
+const jpgDir = mkdtempSync(join(tmpdir(), 'pb-vfj-'));
+const jpgKhung = join(jpgDir, 'khung-dac.jpg');
+writeFileSync(jpgKhung, await sharp({
+  create: { width: 600, height: 1800, channels: 3, background: { r: 36, g: 31, b: 43 } },
+}).jpeg().toBuffer());
+
+await sp.setInputFiles('input[type=file]', jpgKhung);
+await sp.waitForSelector('.frame-preview', { timeout: 15000 });
+await sp.waitForTimeout(300);
+
+check('ảnh đặc: vẽ ô thành lỗ caro (class se-duc)',
+  (await sp.locator('.se-box.se-duc').count()) === 1);
+check('ảnh đặc: vào màn với 0 ô và nút Lưu bị khoá',
+  (await sp.locator('.slot-box').count()) === 0
+  && await sp.isDisabled('.preview-actions button.primary'));
+
+await sp.click('.se-tools .se-chip:has-text("3")');
+await sp.waitForTimeout(200);
+check('ảnh đặc: xếp nhanh ra 3 ô và mở lại nút Lưu',
+  (await sp.locator('.slot-box').count()) === 3
+  && !(await sp.isDisabled('.preview-actions button.primary')));
+
+const dienTich = () => sp.evaluate(() => [...document.querySelectorAll('.slot-box')]
+  .reduce((t, e) => {
+    const r = e.getBoundingClientRect();
+    return t + r.width * r.height;
+  }, 0));
+
+const dt0 = await dienTich();
+await sp.click('.se-tools .se-chip[title^="Thu nhỏ"]');
+await sp.waitForTimeout(150);
+const dt1 = await dienTich();
+check('chừa viền: bấm co thì mọi ô nhỏ lại',
+  dt1 < dt0, `${Math.round(dt0)} -> ${Math.round(dt1)}`);
+
+await sp.click('.se-tools .se-chip[title^="Nới"]');
+await sp.waitForTimeout(150);
+check('chừa viền: bấm nới thì về đúng cỡ cũ',
+  Math.abs((await dienTich()) - dt0) < dt0 * 0.02);
+
+// Nới quá tay: ô phải dừng ở mép ảnh, không tràn ra ngoài
+for (let i = 0; i < 12; i++) await sp.click('.se-tools .se-chip[title^="Nới"]');
+await sp.waitForTimeout(250);
+const tran = await sp.evaluate(() => {
+  const b = document.querySelector('.preview-img img').getBoundingClientRect();
+  return [...document.querySelectorAll('.slot-box')].some((e) => {
+    const r = e.getBoundingClientRect();
+    return r.left < b.left - 1 || r.right > b.right + 1
+      || r.top < b.top - 1 || r.bottom > b.bottom + 1;
+  });
+});
+check('chừa viền: nới quá tay ô KHÔNG tràn ra ngoài ảnh', tran === false);
+
+await sp.click('.preview-actions .ghost');
+await sp.waitForTimeout(300);
+
+// Khung đã có lỗ sẵn thì KHÔNG vẽ caro: ở đó ô là khung ngắm, không phải vết cắt
+await sp.setInputFiles('input[type=file]', 'public/frames/basic-4.png');
+await sp.waitForSelector('.frame-preview', { timeout: 15000 });
+await sp.waitForTimeout(300);
+check('khung có lỗ sẵn: KHÔNG vẽ ô thành caro',
+  (await sp.locator('.se-box.se-duc').count()) === 0);
+await sp.click('.preview-actions .ghost');
+await sp.waitForTimeout(300);
+
 console.log('\n--- Hộp thoại xác nhận ---');
 
 const nFrames = await sp.locator('.frame-card').count();

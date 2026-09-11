@@ -193,6 +193,69 @@ export default function FramesPanel() {
         </div>
       </div>
 
+      {/*
+        Hướng dẫn chuẩn bị file, đặt NGAY DƯỚI nút tải lên.
+        Gập sẵn: ai làm đúng rồi thì không phải đọc lại mỗi lần, còn lúc vướng
+        thì không phải đi tìm ở chỗ khác. Dùng <details> nên không cần state,
+        và vẫn gập/mở được kể cả khi JS có lỗi.
+      */}
+      <details className="frame-help">
+        <summary>Cách chuẩn bị file khung ảnh</summary>
+
+        <p>
+          Khung ảnh <b>không phải một tấm ảnh kín</b> — nó là tấm <b>có lỗ</b>.
+          Hoa văn, chữ, viền nằm ở ngoài; chỗ để ảnh khách hiện ra phải{' '}
+          <b>trống rỗng</b>. Chỗ hay nhầm nhất:{' '}
+          <b>“trống rỗng” khác với “màu trắng”</b> — trắng vẫn là một màu, vẫn
+          phủ kín.
+        </p>
+
+        <p>
+          Trong phần mềm thiết kế, vùng trong suốt được vẽ thành <b>ô caro</b>,
+          giống hoa văn sau các khung trong thư viện phía dưới. Thấy ô caro là
+          đúng; thấy màu trắng phẳng là chưa được.
+        </p>
+
+        <h4>Xuất file cho đúng</h4>
+        <ul>
+          <li>
+            <b>Canva:</b> Share → Download → PNG → tick{' '}
+            <b>Transparent background</b> (cần Canva Pro)
+          </li>
+          <li><b>Figma:</b> xoá Fill của frame → Export → PNG</li>
+          <li>
+            <b>Photoshop:</b> xoá layer Background → File → Export As → PNG →
+            tick <b>Transparency</b>
+          </li>
+          <li>
+            <b>Illustrator:</b> File → Export As → PNG → Background:{' '}
+            <b>Transparent</b>
+          </li>
+        </ul>
+
+        <h4>Kích thước nên xuất (300 DPI)</h4>
+        <ul>
+          <li>Dải dọc 3–4 ô · khổ 2×6 inch → <b>600 × 1800 px</b></li>
+          <li>Tờ 6 ô · khổ 4×6 inch → <b>1200 × 1800 px</b></li>
+          <li>Tờ vuông 9 ô · khổ 6×6 inch → <b>1800 × 1800 px</b></li>
+        </ul>
+        <p className="muted small">
+          Xuất to hơn vẫn tốt. Nhỏ hơn thì in ra rỗ.
+        </p>
+
+        <h4>Nếu chỉ có ảnh đặc</h4>
+        <p>
+          Vẫn dùng được: bạn tự vẽ ô, phần mềm khoét thủng đúng những ô đó.
+          Nhưng lỗ khoét luôn là <b>hình chữ nhật vuông góc</b>, nên hãy kéo ô{' '}
+          <b>lọt hẳn vào trong lòng viền</b> — chờm lên hoa văn tới đâu là mất
+          hoa văn tới đó. Bấm <b>Chừa viền −</b> để thu nhỏ đều cả loạt ô.
+        </p>
+        <p className="muted small">
+          File <b>.jpg</b> thì luôn là ảnh đặc. Còn đuôi <b>.png</b> mà lúc
+          xuất quên tắt nền thì cũng vẫn đặc — đây là lỗi hay gặp nhất.
+        </p>
+      </details>
+
       {error && <p className="error">{error}</p>}
 
       {enabledCount === 0 && frames.length > 0 && (
@@ -208,6 +271,7 @@ export default function FramesPanel() {
             src={pending.url}
             slots={pending.analysis.slots}
             ratio={pending.analysis.width / pending.analysis.height}
+            duc={pending.analysis.duc}
             onChange={(slots) => setPending({
               ...pending,
               analysis: { ...pending.analysis, slots },
@@ -269,8 +333,9 @@ export default function FramesPanel() {
             {pending.analysis.duc ? (
               <p className="muted small">
                 Ảnh này không có sẵn vùng trong suốt, nên các ô bạn đặt sẽ được
-                khoét thủng để ảnh khách hiện qua. Phần còn lại của khung giữ
-                nguyên.
+                khoét thủng để ảnh khách hiện qua. <b>Vùng caro trên ảnh là lỗ
+                sắp khoét</b> — kéo ô lọt hẳn vào trong lòng viền, vì chờm lên
+                hoa văn tới đâu là mất hoa văn tới đó.
               </p>
             ) : (
               <p className="muted small">
