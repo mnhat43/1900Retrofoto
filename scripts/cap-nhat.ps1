@@ -25,6 +25,12 @@ param(
 
 . (Join-Path $PSScriptRoot 'lib-net.ps1')
 
+# Goi khong kem tham so (nhap dup loi tat, hoac CAP-NHAT.bat trong thu muc vua
+# giai nen) thi goi "moi" chinh la thu muc chua script nay. CAP-NHAT.bat khong
+# truyen gi ca, nen thieu dong nay la $NewDir rong va moi Join-Path phia duoi
+# deu nem loi ra man hinh.
+if (-not $NewDir) { $NewDir = $PSScriptRoot }
+
 $Repo = 'mnhat43/1900Retrofoto'
 $AssetName = '1900Retrofoto.zip'
 
@@ -129,7 +135,14 @@ if (-not (Test-Path $envPath)) {
 # Day la duong nhan vien di: nhap dup loi tat CAP-NHAT ngoai man hinh. Loi
 # tat tro vao thu muc cai dat, nen NewDir trung OldDir - lay do lam dau hieu
 # "khong co san goi moi, phai tu di lay".
-if ((Resolve-Path $NewDir).Path -eq (Resolve-Path $OldDir).Path) {
+#
+# -ErrorAction SilentlyContinue chu khong de Resolve-Path nem loi: duong dan
+# khong phan giai duoc thi cau lenh nay hong, dieu kien thanh sai, va script
+# lang le roi xuong che do TAY voi mot thu muc khong dung - dung ra phai bao
+# hong ngay. So bang chuoi rong thi hai ben cung $null, van khong nham lan.
+$newResolved = (Resolve-Path $NewDir -ErrorAction SilentlyContinue).Path
+$oldResolved = (Resolve-Path $OldDir -ErrorAction SilentlyContinue).Path
+if ($newResolved -and $oldResolved -and $newResolved -eq $oldResolved) {
   $current = Get-AppVersion $OldDir
   Say "Ban dang chay:  v$current" 'White'
   Say 'Dang hoi GitHub xem co ban moi khong...'
@@ -244,6 +257,14 @@ if ((Resolve-Path $NewDir).Path -eq (Resolve-Path $OldDir).Path) {
 # ---------------------------------------------------------------------------
 # 4. Che do TAY: da co san goi moi o $NewDir
 # ---------------------------------------------------------------------------
+#
+# Den day ma $NewDir khong tro toi dau la sai tham so, khong phai goi thieu
+# file. Noi thang thay vi de vong lap duoi bao "thieu thu muc 'server'" - hai
+# nguyen nhan khac han nhau ma cach sua cung khac han.
+if (-not $newResolved) {
+  Stop-Here "Khong thay thu muc goi moi: '$NewDir'. Giai nen lai roi chay CAP-NHAT.bat TRONG thu muc vua giai nen."
+}
+
 foreach ($d in $CodeDirs) {
   if (-not (Test-Path (Join-Path $NewDir $d))) {
     Stop-Here "Thu muc moi thieu '$d' -> giai nen chua xong hoac sai thu muc. Giai nen lai roi thu lai."
