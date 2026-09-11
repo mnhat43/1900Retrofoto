@@ -63,9 +63,14 @@ if (-not $OldDir) {
   }
 }
 
-# Chua dang ky tac vu (cai bang tay, hoac tac vu bi xoa) -> do cac cho quen
+# Chua dang ky tac vu (cai bang tay, hoac tac vu bi xoa) -> do cac cho quen.
+#
+# Phai Test-Path ca thu muc TRUOC: 'Join-Path D:\... x' tren may khong co o D
+# nem loi do loe ra man hinh, nhan vien tuong hong trong khi script van chay
+# binh thuong.
 if (-not $OldDir) {
   foreach ($guess in @('C:\1900Retrofoto', 'D:\1900Retrofoto', 'E:\1900Retrofoto')) {
+    if (-not (Test-Path $guess)) { continue }
     if (Test-Path (Join-Path $guess '.env.local')) { $OldDir = $guess; break }
   }
 }
