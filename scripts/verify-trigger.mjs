@@ -14,6 +14,9 @@ const dataDir = mkdtempSync(join(tmpdir(), 'pb-trig-'));
 process.env.PHOTOBOOTH_DATA = dataDir;
 process.env.PHOTOBOOTH_PASSWORD = 'test-secret';
 process.env.PHOTOBOOTH_PORT = '8198';
+// Dải cổng trigger riêng: mặc định 8100 là của server thật đang chạy trên
+// máy dev, trùng vào đó thì test bắn nhầm sang nó và luôn trượt.
+process.env.PHOTOBOOTH_TRIGGER_BASE = '8600';
 process.env.PHOTOBOOTH_HOST = '127.0.0.1:8198';
 
 const { start } = await import('../server/index.ts');
@@ -130,6 +133,25 @@ check('máy ảnh bắt đầu chụp -> TỰ nhận mã, ảnh vào được',
 // Không có mã chờ thì không làm gì, không đổ server
 const t3 = await api('/api/trigger?room=3&event_type=session_start&param1=Print');
 check('phòng không có mã chờ: bỏ qua êm', t3.status === 200);
+
+// CỔNG RIÊNG MỖI PHÒNG: LumaBooth vứt đường dẫn và tham số, chỉ giữ
+// host:cổng — nên cổng là thứ duy nhất nói lên phòng nào gọi. Quan sát
+// từ LumaBooth 8 thật: nó gọi GET /?event_type=...&param1=...
+const base = Number(process.env.PHOTOBOOTH_TRIGGER_BASE ?? 8100);
+const made3 = await api('/api/staff/sessions', {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ maxPhotos: 4, room: '3' }),
+});
+check('tạo được mã chờ cho phòng 3', made3.status === 200 && !!made3.body.code);
+
+const viaPort = await fetch(
+  'http://127.0.0.1:' + (base + 3) + '/?event_type=session_start&param1=OnlyGIF',
+).then((r) => r.status).catch(() => 0);
+check('cổng riêng của phòng 3 nhận được trigger', viaPort === 200, String(viaPort));
+
+await new Promise((r) => setTimeout(r, 300));
+const p3 = await send('3', Date.now());
+check('gọi qua cổng riêng cũng TỰ nhận mã', p3.status === 200, JSON.stringify(p3.body));
 
 // Phòng lạ / sự kiện lạ không được làm server đổ
 const bad = await api('/api/trigger?room=99&event_type=linh_tinh');

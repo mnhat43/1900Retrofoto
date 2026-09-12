@@ -29,7 +29,7 @@ import {
   deleteFrame, seedBuiltins,
 } from './frames.ts';
 import type { DetectedSlot } from './detect.ts';
-import { handleTrigger, shotFloor } from './trigger.ts';
+import { handleTrigger, shotFloor, listenTriggerPorts } from './trigger.ts';
 import { renderFromOriginals, type Recipe } from './render.ts';
 import { listPresets, createPreset, updatePreset, deletePreset } from './presets.ts';
 import { runCleanup, cleanupTiers, purgeOlderThan, CLEANUP_TIERS } from './cleanup.ts';
@@ -588,17 +588,7 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
        * Không có mã chờ thì im lặng bỏ qua — nhân viên chưa tạo mã, hoặc
        * phòng đã có phiên đang chạy.
        */
-      if (event === 'session_start') {
-        const waiting = pendingForRoom(room);
-        if (waiting) {
-          const c = claimSession(room, waiting.code);
-          logLine(
-            c.ok
-              ? `phòng ${room}: tự nhận mã ${waiting.code} khi máy ảnh bắt đầu chụp`
-              : `phòng ${room}: không tự nhận được mã ${waiting.code} (${c.reason})`,
-          );
-        }
-      }
+      if (event === 'session_start') autoClaim(room);
     }
     json(res, 200, { ok: true });
     return true;
@@ -986,6 +976,23 @@ function serveStatic(ctx: Ctx): void {
  * thì một lỗi bất ngờ trong script sẽ bị ghi log rồi bỏ qua — script vẫn báo
  * "OK". Đúng chỗ đó thì fail-fast mới là hành vi cần.
  */
+/**
+ * Máy ảnh bắt đầu chụp mà phòng đang có mã chờ -> tự nhận hộ khách.
+ *
+ * Phòng chỉ có MỘT màn hình và LumaBooth chiếm trọn, khách không có chỗ gõ
+ * 4 số. Mã vẫn là vé vào cửa như cũ, chỉ khác ai bấm.
+ */
+function autoClaim(room: string): void {
+  const waiting = pendingForRoom(room);
+  if (!waiting) return;
+  const c = claimSession(room, waiting.code);
+  logLine(
+    c.ok
+      ? `phòng ${room}: tự nhận mã ${waiting.code} khi máy ảnh bắt đầu chụp`
+      : `phòng ${room}: không tự nhận được mã ${waiting.code} (${c.reason})`,
+  );
+}
+
 function installProcessGuards(): void {
   process.on('uncaughtException', (err) => logError('Lỗi không bắt được', err));
   process.on('unhandledRejection', (reason) => logError('Promise bị bỏ lỡ', reason));
@@ -1047,6 +1054,22 @@ export function start(port = CONFIG.port) {
     }
     console.log('');
   });
+
+  /*
+   * Mỗi phòng một cổng riêng cho trigger LumaBooth — nó vứt đường dẫn và
+   * tham số nên cổng là thứ duy nhất phân biệt được phòng nào gọi.
+   */
+  const triggers = listenTriggerPorts(
+    CONFIG.rooms,
+    (room, event, params) => {
+      const r = handleTrigger(room, event, params);
+      logLine(`trigger phòng ${room}: ${event} — ${r.note}`);
+      if (event === 'session_start') autoClaim(room);
+    },
+    logLine,
+  );
+  server.on('close', () => { for (const t of triggers) t.close(); });
+
   return server;
 }
 
