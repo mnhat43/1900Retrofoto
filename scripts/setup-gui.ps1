@@ -163,6 +163,14 @@ $btn.Add_Click({
       $conf['PHOTOBOOTH_PORT'] = $port
       if ($cap) { $conf['PHOTOBOOTH_CAPTURE'] = $cap }
 
+      # Chi hien phong 2 va 3 o trang quan ly.
+      #
+      # Phong 1 chay LumaBooth chiem tron man hinh nen khach khong co cho
+      # nhap ma 4 so - phong do trien khai sau bang trigger (server mo san
+      # cong 8101-8103 cho viec nay). Chi ghi khi file chua co khoa nay,
+      # de lan cai lai khong de len lua chon nguoi dung da sua bang tay.
+      if (-not $conf.ContainsKey('PHOTOBOOTH_ROOMS')) { $conf['PHOTOBOOTH_ROOMS'] = '2,3' }
+
       # PHOTOBOOTH_HOST: dia chi duoc IN VAO MA QR cua khach.
       #
       # Ghi thang vao day thay vi de server tu doan card mang luc chay. Server

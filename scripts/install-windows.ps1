@@ -21,6 +21,10 @@ param(
   # Thu muc goc noi phan mem may anh luu anh (de trong = them anh thu cong)
   [string]$CaptureDir = "",
   [string]$Password = "",
+  # Danh sach phong hien o trang quan ly. Mac dinh 2,3: phong 1 chay
+  # LumaBooth chiem tron man hinh nen khach khong co cho nhap ma, se
+  # trien khai sau bang trigger.
+  [string]$Rooms = "2,3",
   # Tu dung server cu dang giu cong ma khong hoi
   [switch]$Force
 )
@@ -167,6 +171,7 @@ PHOTOBOOTH_PASSWORD=$Password
 PHOTOBOOTH_PORT=$Port
 PHOTOBOOTH_CAPTURE=$CaptureDir
 PHOTOBOOTH_HOST=${ip}:${Port}
+PHOTOBOOTH_ROOMS=$Rooms
 "@
 # Ghi UTF-8 KHONG BOM. Set-Content -Encoding utf8 tren PowerShell 5.1 luon
 # them BOM, lam hong khoa dau tien khi server doc file.
