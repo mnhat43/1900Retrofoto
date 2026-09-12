@@ -153,6 +153,34 @@ await new Promise((r) => setTimeout(r, 300));
 const p3 = await send('3', Date.now());
 check('gọi qua cổng riêng cũng TỰ nhận mã', p3.status === 200, JSON.stringify(p3.body));
 
+// KHÔNG ĐƯỢC NHÂN BẢN: fs.watch bắn nhiều sự kiện cho một file, agent còn
+// quét định kỳ — cùng một ảnh dễ gửi lên mấy lần. Khách từng thấy mỗi kiểu
+// lặp ba lần vì /api/capture không lọc theo tên file.
+const made4 = await api('/api/staff/sessions', {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ maxPhotos: 6, room: '2' }),
+});
+await api('/api/room/claim', {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ room: '2', code: made4.body.code }),
+});
+
+async function sendNamed(room, name) {
+  const res = await fetch(
+    BASE + '/api/capture?room=' + room + '&source=agent&name=' + encodeURIComponent(name),
+    { method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: await jpeg() },
+  );
+  return { status: res.status, body: await res.json().catch(() => ({})) };
+}
+
+const one = await sendNamed('2', 'IMG_0001.JPG');
+check('ảnh đầu tiên vào được', one.status === 200, JSON.stringify(one.body));
+const again = await sendNamed('2', 'IMG_0001.JPG');
+check('gửi LẠI cùng tên file thì bị từ chối',
+  again.status === 409 && again.body.reason === 'duplicate', JSON.stringify(again.body));
+const other = await sendNamed('2', 'IMG_0002.JPG');
+check('ảnh khác tên vẫn vào bình thường', other.status === 200, JSON.stringify(other.body));
+
 // Phòng lạ / sự kiện lạ không được làm server đổ
 const bad = await api('/api/trigger?room=99&event_type=linh_tinh');
 check('phòng lạ vẫn trả 200, không đổ server', bad.status === 200);

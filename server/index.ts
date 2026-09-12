@@ -619,11 +619,18 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     try {
       const data = await readBody(req);
       const source = url.searchParams.get('source') === 'agent' ? 'agent' : 'manual';
-      const r = await addPhoto(s, data, source);
+      /*
+       * Tên file gốc là thứ chống gửi trùng: intakeFromFolder và agent đều
+       * nhận diện ảnh đã nạp theo tên này. Bỏ quên nó thì cùng một ảnh gửi
+       * lại vẫn lọt, và khách thấy mỗi kiểu lặp mấy lần.
+       */
+      const name = url.searchParams.get('name') ?? undefined;
+      const r = await addPhoto(s, data, source, name);
       json(res, 200, { photo: publicPhoto(r.photo), count: r.count, remaining: r.remaining });
     } catch (err) {
       if (err instanceof CaptureError) {
-        json(res, err.code === 'full' ? 409 : 400, { error: err.message, reason: err.code });
+        const conflict = err.code === 'full' || err.code === 'duplicate';
+        json(res, conflict ? 409 : 400, { error: err.message, reason: err.code });
       } else {
         json(res, 400, { error: String((err as Error).message) });
       }

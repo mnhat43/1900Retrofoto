@@ -193,7 +193,8 @@ async function handleFile(room: string, path: string): Promise<void> {
     const data = await readFile(path);
     const res = await fetch(
       `${CONFIG.server}/api/capture?room=${encodeURIComponent(room)}` +
-        `&source=agent&mtime=${Math.round(info.mtimeMs)}`,
+        `&source=agent&mtime=${Math.round(info.mtimeMs)}` +
+        `&name=${encodeURIComponent(name)}`,
       {
         method: 'POST',
         headers: { 'content-type': MIME[extname(name).toLowerCase()] ?? 'image/jpeg' },
@@ -221,6 +222,14 @@ async function handleFile(room: string, path: string): Promise<void> {
     if (body.reason === 'stale') {
       markSent(key, room, path);
       log(`phòng ${room}: ${name} thuộc lượt trước, bỏ qua`);
+      return;
+    }
+    /*
+     * Server đã có ảnh này rồi (fs.watch bắn nhiều sự kiện cho một file).
+     * Đánh dấu đã gửi để thôi thử lại.
+     */
+    if (body.reason === 'duplicate') {
+      markSent(key, room, path);
       return;
     }
     // Đủ ảnh rồi -> đánh dấu để khỏi thử lại mãi

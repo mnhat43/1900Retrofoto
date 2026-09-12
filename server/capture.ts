@@ -51,8 +51,8 @@ export function getPhoto(sessionId: string, photoId: string): Photo | null {
 
 export class CaptureError extends Error {
   // Không dùng parameter property — Node strip-types không hỗ trợ (sinh code runtime)
-  code: 'full' | 'closed' | 'bad_image';
-  constructor(message: string, code: 'full' | 'closed' | 'bad_image') {
+  code: 'full' | 'closed' | 'bad_image' | 'duplicate';
+  constructor(message: string, code: 'full' | 'closed' | 'bad_image' | 'duplicate') {
     super(message);
     this.code = code;
   }
@@ -110,6 +110,19 @@ export async function addPhoto(
 ): Promise<{ photo: Photo; count: number; remaining: number }> {
   if (session.status !== 'active' && session.status !== 'shooting') {
     throw new CaptureError('Phiên không ở trạng thái chụp', 'closed');
+  }
+
+  /*
+   * Cùng một file gửi lại thì bỏ qua, không thêm bản sao.
+   *
+   * fs.watch bắn NHIỀU sự kiện cho một file (tạo, ghi, đóng) và agent còn
+   * có vòng quét định kỳ, nên cùng một ảnh dễ tới đây mấy lần. Trước đây
+   * chỉ intakeFromFolder lọc trùng, còn đường /api/capture thì không —
+   * khách thấy mỗi kiểu lặp ba lần.
+   */
+  if (sourceName) {
+    const dup = listPhotos(session.id).some((p) => p.sourceName === sourceName);
+    if (dup) throw new CaptureError('Ảnh này đã nạp rồi', 'duplicate');
   }
 
   // Giữ chỗ TRƯỚC khi xử lý ảnh — xem chú thích ở reserveSeq.
