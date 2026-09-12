@@ -197,16 +197,14 @@ echo.
 echo   Agent lay anh tu cac may phong
 echo   De cua so nay mo. Dong la agent dung.
 echo.
-runtime
-ode.exe --experimental-strip-types --disable-warning=ExperimentalWarning agentwatcher.ts
+runtime\node.exe --experimental-strip-types --disable-warning=ExperimentalWarning agent\watcher.ts
 pause
 '@ | ForEach-Object { Write-BatFile (Join-Path $OutDir "Chay-agent.cmd") $_ }
 
 @'
 @echo off
 cd /d "%~dp0"
-start "" /b runtime
-ode.exe --experimental-strip-types --disable-warning=ExperimentalWarning agentwatcher.ts
+start "" /b runtime\node.exe --experimental-strip-types --disable-warning=ExperimentalWarning agent\watcher.ts
 '@ | ForEach-Object { Write-BatFile (Join-Path $OutDir "Chay-agent-am-tham.cmd") $_ }
 
 Write-Host "  [ok] Da tao file khoi dong"
