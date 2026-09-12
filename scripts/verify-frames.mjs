@@ -240,8 +240,9 @@ check('không có lỗi javascript nào', errs.length === 0, errs.slice(0, 2).jo
 const hiBuf = Buffer.from(await (await fetch(
   `${BASE}/media/strips/${detail.composites[0].id}?s=${detail.composites[0].slug}`)).arrayBuffer());
 const hiMeta = await sharp(hiBuf).metadata();
-check('ảnh ghép đúng khổ 300 DPI',
-  hiMeta.width === 1200 && hiMeta.height === 1800,
+// 4x6 inch o SERVER_DPI (600) = 2400x3600. Trinh duyet van dung 300 DPI.
+check('ảnh ghép đúng khổ 600 DPI của server',
+  hiMeta.width === 2400 && hiMeta.height === 3600,
   `${hiMeta.width}x${hiMeta.height}`);
 
 const sp = await browser.newPage({ viewport: { width: 1366, height: 768 } });

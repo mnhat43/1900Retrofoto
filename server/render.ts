@@ -5,7 +5,7 @@ import { getFrame, readFrameImage } from './frames.ts';
 import { listPhotos } from './capture.ts';
 import type { Session } from './session.ts';
 import { resolveImagePlacement, slotRectPx } from '../src/core/placement.ts';
-import { framePx } from '../src/core/format.ts';
+import { framePx, SERVER_DPI } from '../src/core/format.ts';
 import { applyColor, isIdentity } from '../src/render/color.ts';
 import type { ColorState } from '../src/core/types.ts';
 
@@ -88,7 +88,12 @@ export async function renderFromOriginals(
   const frame = getFrame(recipe.frameId);
   if (!frame) return null;
 
-  const page = framePx(frame);
+  /*
+   * Dung SERVER_DPI (600) chu khong phai DPI (300) cua trinh duyet.
+   * Day chinh la ly do co buoc dung lai o server: khong vuong tran canvas
+   * iOS nen in duoc o do net gap doi.
+   */
+  const page = framePx(frame, SERVER_DPI);
   const photos = listPhotos(session.id);
 
   // Nền trắng, đúng như drawStrip ở client
@@ -176,6 +181,14 @@ export async function renderFromOriginals(
       .toBuffer();
     out = await sharp(out).composite([{ input: resized }]).png().toBuffer();
   }
+
+  /*
+   * Ghi DPI vao metadata anh.
+   *
+   * Khong ghi thi sharp de mac dinh 72, va phan mem in doc so do se tinh ra
+   * kho giay sai — anh 2x6 inch bi hieu thanh 16x50 inch.
+   */
+  out = await sharp(out).withMetadata({ density: SERVER_DPI }).png().toBuffer();
 
   return { data: out, width: page.w, height: page.h };
 }

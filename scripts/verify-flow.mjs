@@ -189,10 +189,19 @@ check('có ảnh proxy', readdirSync(join(sessionDir, 'previews')).length === 4)
 const strips = readdirSync(join(sessionDir, 'strips'));
 check('có ảnh đã ghép khung', strips.length === 1, strips.join(','));
 
-// Ảnh ghép phải đúng khổ 300 DPI của khung 4 ô
+/*
+ * Ảnh ghép phải ở SERVER_DPI (600), không phải 300 của trình duyệt.
+ *
+ * Điện thoại ghép ở 300 DPI vì vướng trần canvas iOS, rồi server dựng lại
+ * từ ảnh gốc ở gấp đôi — đó là điểm khác biệt duy nhất giữa ảnh khách xem
+ * trước và ảnh khách tải về. Số này tụt về 600x1800 nghĩa là bước dựng lại
+ * đã thất bại và khách đang nhận bản mờ.
+ */
 const meta = await sharp(join(sessionDir, 'strips', strips[0])).metadata();
-check('ảnh ghép đúng 600x1800 (2x6 inch @300DPI)',
-  meta.width === 600 && meta.height === 1800, `${meta.width}x${meta.height}`);
+check('ảnh ghép đúng 1200x3600 (2x6 inch @600DPI server)',
+  meta.width === 1200 && meta.height === 3600, `${meta.width}x${meta.height}`);
+check('ảnh ghép ghi đúng DPI vào metadata',
+  meta.density === 600, String(meta.density));
 
 // ---------------------------------------------------------------------------
 console.log('\n--- Nhân viên lấy hộ ảnh ---');

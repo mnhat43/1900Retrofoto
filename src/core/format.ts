@@ -14,6 +14,19 @@
  */
 export const DPI = 300;
 
+/**
+ * DPI server dùng khi dựng lại ảnh ghép từ ảnh gốc.
+ *
+ * Cao gấp đôi bản trình duyệt: ảnh máy chụp 3984px ép xuống ô 510px ở 300
+ * DPI là thu nhỏ 7.8 lần, nhìn rõ mờ so với tự ghép tay. Ở 600 DPI ô đạt
+ * hơn 1000px, chỉ còn thu nhỏ 3.9 lần.
+ *
+ * KHÔNG nâng DPI dùng chung, vì framePx còn chạy trên trình duyệt khách:
+ * khổ 12x12in ở 600 DPI thành 51.8M điểm ảnh, vượt trần canvas iOS (~16.7M)
+ * và khách iPhone sẽ không ghép được ảnh nào.
+ */
+export const SERVER_DPI = 600;
+
 export type PageFormat = {
   id: string;
   label: string;
@@ -62,19 +75,22 @@ export function formatPx(format: PageFormat) {
  * khổ nào cũng được, không bó vào 3 khổ dựng sẵn. Không khai thì quay về khổ
  * theo formatId như cũ.
  */
-export function framePx(frame: {
-  formatId: string;
-  widthInch?: number;
-  heightInch?: number;
-}) {
+export function framePx(
+  frame: {
+    formatId: string;
+    widthInch?: number;
+    heightInch?: number;
+  },
+  dpi: number = DPI,
+) {
   if (frame.widthInch && frame.heightInch) {
     return {
-      w: Math.round(frame.widthInch * DPI),
-      h: Math.round(frame.heightInch * DPI),
+      w: Math.round(frame.widthInch * dpi),
+      h: Math.round(frame.heightInch * dpi),
     };
   }
   const f = FORMATS[frame.formatId as FormatId] ?? FORMATS.strip;
-  return formatPx(f);
+  return { w: Math.round(f.widthInch * dpi), h: Math.round(f.heightInch * dpi) };
 }
 
 /** Nhãn hiển thị: "4×6 inch". Rút gọn số lẻ thừa (4.0 -> 4). */
