@@ -8,7 +8,7 @@ import { loadPhotosFromUrls, loadOverlay } from '../../media/assets';
 import { framePx, type FormatId } from '../../core/format';
 import { DEFAULT_COLOR, DEFAULT_CONTENT } from '../../core/types';
 import type { ColorState, Frame, Photo, SlotContent } from '../../core/types';
-import { exportStrip, downloadBlob } from '../../render/export';
+import { exportStrip } from '../../render/export';
 import { PRESETS } from '../../render/color';
 import { resetContent } from '../../core/interaction';
 import { clampContent, slackOf, slotRectPx, MIN_ZOOM, MAX_ZOOM } from '../../core/placement';
@@ -237,14 +237,20 @@ export default function StudioApp() {
 
         {/* Chỉ còn một việc cần làm ở màn này: tải ảnh về. */}
         <div className="actions">
-          <button
+          {/*
+            Tải bản SERVER dựng, không phải result.blob điện thoại tự ghép.
+            Điện thoại ghép ở 300 DPI vì vướng trần canvas iOS; server dựng
+            lại từ ảnh gốc ở 600 DPI. Tải nhầm blob là khách xem ảnh nét trên
+            màn hình rồi nhận về bản mờ — mà ảnh hiện ngay bên trên chính là
+            bản nét, nên không ai nghĩ là tải sai.
+          */}
+          <a
             className="btn btn-primary wide"
-            onClick={() =>
-              downloadBlob(result.blob, `photostrip-${session?.code ?? 'anh'}.png`)
-            }
+            href={compositeUrl(result.composite.id, result.composite.slug)}
+            download={`photostrip-${session?.code ?? 'anh'}.png`}
           >
             Tải xuống
-          </button>
+          </a>
         </div>
       </div>
     );
