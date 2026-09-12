@@ -53,12 +53,22 @@ function loadConfig(): Required<Config> & { rooms: Record<string, string> } {
     }
   }
 
-  // Biến môi trường ghi đè file, tiện cho việc test
-  const rooms: Record<string, string> = { ...(cfg.rooms ?? {}) };
+  /*
+   * Biến môi trường ghi đè file — tiện cho việc test và cho máy phòng chỉ
+   * chạy một phòng của nó.
+   *
+   * Khai bằng biến môi trường thì THAY HẲN danh sách trong file, không trộn
+   * vào: trộn thì test chỉ định hai phòng tạm vẫn kéo theo các phòng thật
+   * trong config.json, quét cả chục nghìn ảnh qua ổ mạng và làm test chậm
+   * tới mức trượt.
+   */
+  const fromEnv: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
     const m = k.match(/^PHOTOBOOTH_ROOM(\w+)_DIR$/);
-    if (m && v) rooms[m[1].toLowerCase()] = v;
+    if (m && v) fromEnv[m[1].toLowerCase()] = v;
   }
+  const rooms: Record<string, string> =
+    Object.keys(fromEnv).length > 0 ? fromEnv : { ...(cfg.rooms ?? {}) };
 
   if (Object.keys(rooms).length === 0) {
     console.error('\n  Chưa khai báo thư mục cho phòng nào.');

@@ -10,7 +10,7 @@ import { getDb } from './db.ts';
 import {
   createSession, claimSession, getByToken, activeForRoom, roomDisplaySession,
   listSessions, setStatus, cancelSession, isLockedOut, getById,
-  closeSession, busySession, sessionByAnyToken, openSessionsForRoom,
+  closeSession, busySession, sessionByAnyToken, openSessionsForRoom, pendingForRoom,
   LIVE_STATUSES,
 } from './session.ts';
 import {
@@ -577,6 +577,28 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     if (CONFIG.rooms.includes(room) && event) {
       const r = handleTrigger(room, event, params);
       logLine(`trigger phòng ${room}: ${event} — ${r.note}`);
+
+      /*
+       * LumaBooth bắt đầu chụp mà phòng đang có mã chờ -> tự nhận hộ khách.
+       *
+       * Phòng chỉ có MỘT màn hình và LumaBooth chiếm trọn, khách không có
+       * chỗ gõ 4 số. Mã vẫn là vé vào cửa như cũ, chỉ khác ai bấm: trước
+       * là khách, giờ là chính máy ảnh khi khách bắt đầu chụp.
+       *
+       * Không có mã chờ thì im lặng bỏ qua — nhân viên chưa tạo mã, hoặc
+       * phòng đã có phiên đang chạy.
+       */
+      if (event === 'session_start') {
+        const waiting = pendingForRoom(room);
+        if (waiting) {
+          const c = claimSession(room, waiting.code);
+          logLine(
+            c.ok
+              ? `phòng ${room}: tự nhận mã ${waiting.code} khi máy ảnh bắt đầu chụp`
+              : `phòng ${room}: không tự nhận được mã ${waiting.code} (${c.reason})`,
+          );
+        }
+      }
     }
     json(res, 200, { ok: true });
     return true;

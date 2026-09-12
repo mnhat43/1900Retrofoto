@@ -109,6 +109,28 @@ check('gom đúng 4 ảnh gốc, bỏ đường dẫn file ghép',
   JSON.stringify([...(shot?.files ?? [])]));
 await api('/api/trigger?room=1&event_type=session_end');
 
+// TỰ NHẬN MÃ: phòng một màn hình, khách không gõ được 4 số.
+// Nhân viên tạo mã -> LumaBooth báo bắt đầu chụp -> server tự nhận hộ.
+const made2 = await api('/api/staff/sessions', {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ maxPhotos: 4, room: '2' }),
+});
+check('tạo được mã chờ cho phòng 2', made2.status === 200 && !!made2.body.code);
+
+// Chưa ai nhập mã -> chưa gửi ảnh được
+const before = await send('2', Date.now());
+check('trước khi máy ảnh báo: phòng chưa mở khoá', before.status === 409);
+
+// LumaBooth bắt đầu chụp -> server tự nhận mã
+await api('/api/trigger?room=2&event_type=session_start&param1=PrintAndGIF');
+const after2 = await send('2', Date.now());
+check('máy ảnh bắt đầu chụp -> TỰ nhận mã, ảnh vào được',
+  after2.status === 200, JSON.stringify(after2.body));
+
+// Không có mã chờ thì không làm gì, không đổ server
+const t3 = await api('/api/trigger?room=3&event_type=session_start&param1=Print');
+check('phòng không có mã chờ: bỏ qua êm', t3.status === 200);
+
 // Phòng lạ / sự kiện lạ không được làm server đổ
 const bad = await api('/api/trigger?room=99&event_type=linh_tinh');
 check('phòng lạ vẫn trả 200, không đổ server', bad.status === 200);
