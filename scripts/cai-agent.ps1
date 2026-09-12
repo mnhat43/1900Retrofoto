@@ -18,7 +18,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$AppDir = Split-Path -Parent $PSScriptRoot
+# Thu muc app: trong kho ma nguon script nam trong thu muc scripts nen
+# phai leo len mot cap, con trong goi cai dat no nam ngay thu muc goc.
+# Nhan ra bang cach tim runtime\node.exe - chi thu muc app moi co.
+$nodeRel = Join-Path "runtime" "node.exe"
+$AppDir = if (Test-Path (Join-Path $PSScriptRoot $nodeRel)) {
+  $PSScriptRoot
+} else {
+  Split-Path -Parent $PSScriptRoot
+}
 $TaskName = '1900Retrofoto-Agent'
 
 function Say($m) { Write-Host "  $m" }
@@ -34,7 +42,10 @@ if ($Go) {
   exit 0
 }
 
-$runner = Join-Path $AppDir 'Chay-agent-am-tham.cmd'
+# Chay qua .vbs chu khong phai .cmd: .cmd sinh mot cua so cmd va node
+# thanh tien trinh CON cua no, dong cua so la chet ca hai. File .vbs
+# khoi chay node an hoan toan, khong co cua so nao de ma dong nham.
+$runner = Join-Path $AppDir 'Chay-agent-ngam.vbs'
 if (-not (Test-Path $runner)) {
   Write-Host "  [LOI] Khong thay $runner" -ForegroundColor Red
   exit 1
@@ -44,7 +55,7 @@ if (-not (Test-Path $runner)) {
 $me = "$env:USERDOMAIN\$env:USERNAME"
 $principal = New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive -RunLevel Limited
 
-$act = New-ScheduledTaskAction -Execute $runner -WorkingDirectory $AppDir
+$act = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ("""$runner""") -WorkingDirectory $AppDir
 
 # Hai moc bat: luc dang nhap Windows, va lap lai moi 5 phut de bat lai neu
 # agent chet giua ngay. MultipleInstances=IgnoreNew nen dang chay thi lan

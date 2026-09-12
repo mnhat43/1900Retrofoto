@@ -200,6 +200,18 @@ $btn.Add_Click({
         -LocalPort ([int]$port) -Protocol TCP -Action Allow `
         -Profile Private, Public | Out-Null
 
+      # Cong trigger: mot cong rieng cho moi phong (8100 + so phong).
+      #
+      # LumaBooth tren may phong goi ve bao "dang chup". No chi giu host va
+      # cong trong URL, vut het duong dan - nen khong the dung chung mot
+      # cong. Khong mo thi trigger khong bao gio toi, va trieu chung chi la
+      # "anh thinh thoang lac sang khach sau", rat kho doan ra.
+      $trigRule = "1900 Retrofoto - Trigger"
+      try { Remove-NetFirewallRule -DisplayName $trigRule -ErrorAction Stop } catch { }
+      New-NetFirewallRule -DisplayName $trigRule -Direction Inbound `
+        -LocalPort (8101..8109) -Protocol TCP -Action Allow `
+        -Profile Private, Public | Out-Null
+
       # Va dua luon mang hien tai ve Private cho dung ban chat (mang LAN cua
       # quan, khong phai WiFi san bay). Khong bat buoc thanh cong.
       try {

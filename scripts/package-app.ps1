@@ -146,6 +146,10 @@ foreach ($s in @(
   )) {
   Copy-Item (Join-Path $PSScriptRoot $s) $OutDir -Force
 }
+# File .vbs khoi chay agent an hoan toan. Phai di kem: tac vu Windows tro
+# thang vao no, thieu la CAI-AGENT bao khong tim thay runner.
+Copy-Item (Join-Path $PSScriptRoot "Chay-agent-ngam.vbs") $OutDir -Force
+
 Write-Host "  [ok] Da chep script cai dat va sua chua"
 
 # --- 8. File khoi dong ---
