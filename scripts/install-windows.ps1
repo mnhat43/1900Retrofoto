@@ -127,6 +127,18 @@ try { Remove-NetFirewallRule -DisplayName $ruleName -ErrorAction Stop } catch {}
 New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -LocalPort $Port -Protocol TCP -Action Allow -Profile Private, Public | Out-Null
 Write-Host "  [ok] Mo firewall cong $Port (mang Private va Public)"
 
+# --- Firewall: cong trigger LumaBooth (mot cong moi phong) ---
+#
+# LumaBooth tren may phong goi ve may chu bao "dang chup". No chi giu
+# host va cong trong URL, vut het duong dan - nen moi phong phai mot
+# cong rieng (8100 + so phong). Khong mo thi trigger khong bao gio toi,
+# va trieu chung chi la "anh thinh thoang lac sang khach sau".
+$triggerBase = 8100
+$triggerRule = "Photo Booth Studio - Trigger"
+try { Remove-NetFirewallRule -DisplayName $triggerRule -ErrorAction Stop } catch {}
+New-NetFirewallRule -DisplayName $triggerRule -Direction Inbound -LocalPort (($triggerBase + 1)..($triggerBase + 9)) -Protocol TCP -Action Allow -Profile Private, Public | Out-Null
+Write-Host "  [ok] Mo firewall cong $($triggerBase + 1)-$($triggerBase + 9) (trigger LumaBooth)"
+
 # --- Dia chi LAN ---
 #
 # Dung Get-LanAdapter (loc card ao cua WSL / Docker / VirtualBox / VPN, va
