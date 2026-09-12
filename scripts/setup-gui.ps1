@@ -169,7 +169,9 @@ $btn.Add_Click({
       # nhap ma 4 so - phong do trien khai sau bang trigger (server mo san
       # cong 8101-8103 cho viec nay). Chi ghi khi file chua co khoa nay,
       # de lan cai lai khong de len lua chon nguoi dung da sua bang tay.
-      if (-not $conf.ContainsKey('PHOTOBOOTH_ROOMS')) { $conf['PHOTOBOOTH_ROOMS'] = '2,3' }
+      # .Contains chu khong phai .ContainsKey: Read-EnvLocal tra ve
+      # [ordered]@{} tuc OrderedDictionary, kieu do khong co ContainsKey.
+      if (-not $conf.Contains('PHOTOBOOTH_ROOMS')) { $conf['PHOTOBOOTH_ROOMS'] = '2,3' }
 
       # PHOTOBOOTH_HOST: dia chi duoc IN VAO MA QR cua khach.
       #
