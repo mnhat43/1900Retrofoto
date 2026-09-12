@@ -1,0 +1,4 @@
+# File Windows Script Host doc: phai giu CRLF, doi sang LF co the khong chay.
+*.vbs text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
