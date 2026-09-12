@@ -28,6 +28,8 @@ export default function RoomApp() {
   const [busy, setBusy] = useState('');
   const [offline, setOffline] = useState(false);
   const [captureOn, setCaptureOn] = useState(false);
+  /** Agent dang chay -> anh tu len, khach khong phai bam gi. */
+  const [agentOn, setAgentOn] = useState(false);
   const [intake, setIntake] = useState<IntakeResult | null>(null);
 
   const refresh = useCallback(async () => {
@@ -37,6 +39,7 @@ export default function RoomApp() {
       setPhotos(r.photos ?? []);
       setQr(r.qr ?? null);
       setCaptureOn(!!r.captureEnabled);
+      setAgentOn(!!r.agent);
       setOffline(false);
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) setOffline(true);
@@ -108,11 +111,13 @@ export default function RoomApp() {
    * Có lỗi thật sự cần gọi nhân viên hay không.
    *
    * "Quét mà chưa có ảnh nào" KHÔNG tính là lỗi khi khách chưa chụp xong —
-   * chỉ thành lỗi khi đã quét mà vẫn trắng tay, hoặc chưa cấu hình thư mục,
-   * hoặc mất kết nối tới máy chủ.
+   * chỉ thành lỗi khi đã quét mà vẫn trắng tay, hoặc mất kết nối tới máy chủ.
+   *
+   * Thiếu thư mục chụp chỉ là lỗi khi KHÔNG có agent: chạy bằng agent thì
+   * ảnh tự chảy về, PHOTOBOOTH_CAPTURE để trống là đúng chứ không phải hỏng.
    */
   const problem =
-    !captureOn ||
+    (!captureOn && !agentOn) ||
     offline ||
     !!error ||
     (!!intake && intake.found === 0 && photos.length === 0);
@@ -212,13 +217,20 @@ export default function RoomApp() {
           )}
 
           <div className="actions">
-            <button
-              className="btn btn-primary"
-              disabled={!!busy || !captureOn || remaining <= 0}
-              onClick={onIntake}
-            >
-              {busy || (intake || hasPhotos ? 'Lấy thêm ảnh' : 'Đã chụp xong')}
-            </button>
+            {/*
+              Nút quét thư mục chỉ có nghĩa ở chế độ PHOTOBOOTH_CAPTURE.
+              Chạy bằng agent thì ảnh tự chảy về, bấm cũng không làm gì —
+              để lại chỉ khiến khách bấm rồi tưởng hỏng.
+            */}
+            {captureOn && (
+              <button
+                className="btn btn-primary"
+                disabled={!!busy || remaining <= 0}
+                onClick={onIntake}
+              >
+                {busy || (intake || hasPhotos ? 'Lấy thêm ảnh' : 'Đã chụp xong')}
+              </button>
+            )}
 
             <button
               className="btn btn-ghost"
