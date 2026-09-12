@@ -10,7 +10,7 @@
 #define AppName "1900 Retrofoto"
 ; PHAI khop 2 so dau cua "version" trong package.json - package-app.ps1
 ; kiem tra va tu choi dong goi neu lech.
-#define AppVersion "1.9"
+#define AppVersion "1.10"
 #define AppPublisher "1900 Retrofoto"
 
 [Setup]
