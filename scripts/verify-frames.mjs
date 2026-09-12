@@ -241,8 +241,13 @@ const hiBuf = Buffer.from(await (await fetch(
   `${BASE}/media/strips/${detail.composites[0].id}?s=${detail.composites[0].slug}`)).arrayBuffer());
 const hiMeta = await sharp(hiBuf).metadata();
 // 4x6 inch o SERVER_DPI (600) = 2400x3600. Trinh duyet van dung 300 DPI.
-check('ảnh ghép đúng khổ 600 DPI của server',
-  hiMeta.width === 2400 && hiMeta.height === 3600,
+/*
+ * Khổ 4x6in ở 1200 DPI là 4800x7200 = 34.6M điểm ảnh, vượt ngưỡng RAM nên
+ * fitDpi hạ xuống ~866 DPI. Vẫn nét gấp gần 3 lần bản 300 DPI của điện
+ * thoại — không kiểm số cứng, chỉ chốt là phải lớn hơn hẳn.
+ */
+check('ảnh ghép nét hơn hẳn bản điện thoại (>= 2.5 lần)',
+  hiMeta.width >= 1200 * 2.5 && hiMeta.height >= 1800 * 2.5,
   `${hiMeta.width}x${hiMeta.height}`);
 
 const sp = await browser.newPage({ viewport: { width: 1366, height: 768 } });

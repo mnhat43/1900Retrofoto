@@ -163,7 +163,17 @@ await phone.waitForTimeout(600);
 await phone.click('.actions .btn-primary');
 await phone.waitForSelector('.result', { timeout: 30000 });
 check('lưu xong hiện ảnh kết quả', await phone.isVisible('.result'));
-check('có nút tải xuống', await phone.isVisible('button:has-text("Tải xuống")'));
+/*
+ * Nút tải phải là thẻ <a> trỏ vào /media/strips — tức bản SERVER dựng từ
+ * ảnh gốc. Từng có lúc nó tải result.blob mà điện thoại tự ghép ở DPI thấp:
+ * khách xem ảnh nét trên màn hình rồi nhận về bản mờ, mà hai ảnh nhìn giống
+ * hệt nên không ai nghi là tải sai.
+ */
+const taiVe = phone.locator('a:has-text("Tải xuống")');
+check('có nút tải xuống', await taiVe.isVisible());
+const href = await taiVe.getAttribute('href');
+check('nút tải trỏ vào ảnh SERVER dựng, không phải bản điện thoại tự ghép',
+  (href ?? '').includes('/media/strips/'), href ?? '(khong co href)');
 /*
  * Màn này chỉ còn ĐÚNG MỘT việc: tải ảnh về.
  * Bỏ "Chép link" vì nhân viên xem ảnh thẳng trên trang quản lý, và bỏ "Ghép
@@ -198,10 +208,10 @@ check('có ảnh đã ghép khung', strips.length === 1, strips.join(','));
  * đã thất bại và khách đang nhận bản mờ.
  */
 const meta = await sharp(join(sessionDir, 'strips', strips[0])).metadata();
-check('ảnh ghép đúng 1200x3600 (2x6 inch @600DPI server)',
-  meta.width === 1200 && meta.height === 3600, `${meta.width}x${meta.height}`);
+check('ảnh ghép đúng 2400x7200 (2x6 inch @1200DPI server)',
+  meta.width === 2400 && meta.height === 7200, `${meta.width}x${meta.height}`);
 check('ảnh ghép ghi đúng DPI vào metadata',
-  meta.density === 600, String(meta.density));
+  meta.density === 1200, String(meta.density));
 
 // ---------------------------------------------------------------------------
 console.log('\n--- Nhân viên lấy hộ ảnh ---');

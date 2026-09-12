@@ -5,7 +5,7 @@ import { getFrame, readFrameImage } from './frames.ts';
 import { listPhotos } from './capture.ts';
 import type { Session } from './session.ts';
 import { resolveImagePlacement, slotRectPx } from '../src/core/placement.ts';
-import { framePx, SERVER_DPI } from '../src/core/format.ts';
+import { framePx, SERVER_DPI, DPI } from '../src/core/format.ts';
 import { applyColor, isIdentity } from '../src/render/color.ts';
 import type { ColorState } from '../src/core/types.ts';
 
@@ -81,6 +81,29 @@ function applyColorRaw(
  * Trả null nếu thiếu dữ kiện (khung đã xoá, ảnh gốc không còn) — gọi bên
  * ngoài sẽ giữ nguyên bản khách đã gửi lên thay vì làm hỏng kết quả.
  */
+/** Chiều rộng khung tính bằng inch — để suy ra DPI thật sau khi fitDpi hạ. */
+function frameInchW(frame: Parameters<typeof framePx>[0]): number {
+  return framePx(frame, 1).w;
+}
+
+/** Ngưỡng điểm ảnh an toàn cho một lần dựng: ~70MB canvas RGBA. */
+const MAX_PIXELS = 18_000_000;
+
+/**
+ * Kích thước trang ở SERVER_DPI, hạ xuống nếu vượt ngưỡng RAM.
+ *
+ * Khổ dải 2x6in ở 1200 DPI là 17.3M điểm ảnh — vừa khít. Khổ vuông lớn thì
+ * không, nên phải hạ. Hạ theo căn bậc hai vì số điểm ảnh tăng theo bình
+ * phương DPI.
+ */
+function fitDpi(frame: Parameters<typeof framePx>[0]) {
+  const full = framePx(frame, SERVER_DPI);
+  const px = full.w * full.h;
+  if (px <= MAX_PIXELS) return full;
+  const dpi = Math.floor(SERVER_DPI * Math.sqrt(MAX_PIXELS / px));
+  return framePx(frame, Math.max(DPI, dpi));
+}
+
 export async function renderFromOriginals(
   session: Session,
   recipe: Recipe,
@@ -89,11 +112,15 @@ export async function renderFromOriginals(
   if (!frame) return null;
 
   /*
-   * Dung SERVER_DPI (600) chu khong phai DPI (300) cua trinh duyet.
-   * Day chinh la ly do co buoc dung lai o server: khong vuong tran canvas
-   * iOS nen in duoc o do net gap doi.
+   * Dựng ở SERVER_DPI, không phải DPI của trình duyệt — đây chính là lý do
+   * bước dựng lại ở server tồn tại: điện thoại vướng trần canvas iOS, server
+   * thì không.
+   *
+   * Nhưng có trần RAM: khổ 12x12in ở 1200 DPI là 207M điểm ảnh, tốn ~791MB
+   * chỉ riêng canvas — đủ để giết server giữa ca. Khổ nào vượt ngưỡng thì hạ
+   * DPI xuống cho vừa, vẫn nét hơn bản 300 DPI của điện thoại.
    */
-  const page = framePx(frame, SERVER_DPI);
+  const page = fitDpi(frame);
   const photos = listPhotos(session.id);
 
   // Nền trắng, đúng như drawStrip ở client
@@ -188,7 +215,12 @@ export async function renderFromOriginals(
    * Khong ghi thi sharp de mac dinh 72, va phan mem in doc so do se tinh ra
    * kho giay sai — anh 2x6 inch bi hieu thanh 16x50 inch.
    */
-  out = await sharp(out).withMetadata({ density: SERVER_DPI }).png().toBuffer();
+  /*
+   * DPI THẬT của trang, không phải SERVER_DPI — khổ lớn đã bị fitDpi hạ
+   * xuống. Ghi sai là phần mềm in tính ra khổ giấy sai.
+   */
+  const realDpi = Math.round(page.w / frameInchW(frame));
+  out = await sharp(out).withMetadata({ density: realDpi }).png().toBuffer();
 
   return { data: out, width: page.w, height: page.h };
 }

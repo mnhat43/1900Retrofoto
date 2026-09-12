@@ -17,15 +17,17 @@ export const DPI = 300;
 /**
  * DPI server dùng khi dựng lại ảnh ghép từ ảnh gốc.
  *
- * Cao gấp đôi bản trình duyệt: ảnh máy chụp 3984px ép xuống ô 510px ở 300
- * DPI là thu nhỏ 7.8 lần, nhìn rõ mờ so với tự ghép tay. Ở 600 DPI ô đạt
- * hơn 1000px, chỉ còn thu nhỏ 3.9 lần.
+ * 1200 là NGƯỠNG HỮU ÍCH, không phải con số tuỳ ý. Ô trong dải gần vuông
+ * còn ảnh máy chụp là 3:2, nên mỗi ô chỉ dùng được ~2688px bề ngang của
+ * ảnh gốc. Ở 1200 DPI ô đạt ~2040px — thu nhỏ 1.3 lần, gần như không mất
+ * chi tiết nào. Đẩy cao hơn là PHÓNG TO ảnh gốc lên: file nặng thêm mà
+ * ảnh mờ đi chứ không nét hơn.
  *
  * KHÔNG nâng DPI dùng chung, vì framePx còn chạy trên trình duyệt khách:
  * khổ 12x12in ở 600 DPI thành 51.8M điểm ảnh, vượt trần canvas iOS (~16.7M)
  * và khách iPhone sẽ không ghép được ảnh nào.
  */
-export const SERVER_DPI = 600;
+export const SERVER_DPI = 1200;
 
 export type PageFormat = {
   id: string;
