@@ -872,18 +872,59 @@ button.link.danger { color: var(--danger); }
 .frame-modal { max-width: 720px; }
 
 /*
+ * Khối "Khách sẽ thấy thế này" ở đáy cột phải.
+ * margin-top: auto để nó tụt xuống đáy cột, lấp đúng khoảng trắng mà cột ảnh
+ * dải dọc để lại — chứ không kẹp sát ngay dưới dòng chữ phía trên.
+ */
+.frame-try-wrap {
+  margin-top: auto;
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+/*
+ * Xếp lớp đúng thứ tự lúc render thật: ô ảnh mẫu ở dưới, khung phủ lên trên.
+ * Nền ca-rô để chỗ nào khung còn trong suốt mà KHÔNG có ô nào thì nhìn ra
+ * ngay là lỗ hở, không phải tưởng là nền trắng.
+ */
+.frame-try {
+  position: relative;
+  max-height: 150px;
+  max-width: 100%;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background:
+    repeating-conic-gradient(#b9b3c4 0 25%, #8f8899 0 50%)
+    0 0 / 8px 8px;
+  line-height: 0;
+}
+
+.frame-try-o { position: absolute; }
+
+.frame-try img {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
+/*
  * Hai cột: ảnh bên trái, các trường bên phải.
  *
- * align-items: start chứ KHÔNG stretch. Khung dải dọc cao gấp ba bề rộng nên
- * cột ảnh luôn cao hơn cột chữ; cho cột chữ giãn theo thì mọi thứ trong nó bị
- * đẩy dàn ra giữa khoảng trắng. Để start thì các trường nằm gọn trên đầu, và
- * khoảng trống dồn xuống dưới — nơi không ai để ý.
+ * Cột phải GIÃN hết chiều cao hàng (stretch, mặc định). Khung dải dọc cao gấp
+ * ba bề rộng nên cột ảnh luôn cao hơn cột chữ, và chỗ dư ở cột phải chính là
+ * nơi .frame-try-wrap tụt xuống bằng margin-top: auto. Đặt align-items: start
+ * thì cột phải co sát nội dung, auto không còn chỗ đẩy và bản xem thử dính
+ * ngay dưới dòng chữ.
  */
 .frame-preview {
   display: grid;
   grid-template-columns: minmax(180px, 300px) minmax(240px, 1fr);
   gap: clamp(16px, 2.5vw, 26px);
-  align-items: start;
 }
 
 /*

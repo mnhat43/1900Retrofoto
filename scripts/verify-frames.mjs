@@ -404,6 +404,55 @@ check('thẻ tải khung mở ra dạng modal',
 check('mở thẻ tải khung KHÔNG bóp thư viện khung',
   (await caoList()) === listTruoc, `${listTruoc}px -> ${await caoList()}px`);
 
+/*
+ * XEM THU: dung thu tu lop nhu luc render that.
+ *
+ * Man nan o ve o DE LEN khung, tuc nguoc han thu tu that. Nen phai co mot cho
+ * cho thay ket qua cuoi: anh nam duoi, khung phu len tren. Neu xep lop sai thi
+ * man nay hien ra mot tam khong giong gi anh khach nhan, ma khong bao loi.
+ */
+const thu = await sp.evaluate(() => {
+  const box = document.querySelector('.frame-try');
+  if (!box) return null;
+  const r = box.getBoundingClientRect();
+  const img = box.querySelector('img');
+  const o = [...box.querySelectorAll('.frame-try-o')];
+  const anhFile = document.querySelector('.preview-img img');
+  const oNan = [...document.querySelectorAll('.slot-box')];
+  const nanBox = document.querySelector('.se-box').getBoundingClientRect();
+  // Toa do chuan hoa cua o trong ban xem thu, so voi o tren man nan
+  const chuanThu = o.map((e) => {
+    const q = e.getBoundingClientRect();
+    return [(q.left - r.left) / r.width, (q.top - r.top) / r.height];
+  });
+  const chuanNan = oNan.map((e) => {
+    const q = e.getBoundingClientRect();
+    return [(q.left - nanBox.left) / nanBox.width, (q.top - nanBox.top) / nanBox.height];
+  });
+  return {
+    soO: o.length,
+    khungTrenCung: box.lastElementChild === img,
+    tiLe: r.width / r.height,
+    tiLeFile: anhFile.naturalWidth / anhFile.naturalHeight,
+    lechToaDo: Math.max(...chuanThu.map(([x, y], i) =>
+      Math.max(Math.abs(x - chuanNan[i][0]), Math.abs(y - chuanNan[i][1])))),
+  };
+});
+check('có bản xem thử trước khi lưu', thu !== null);
+check('xem thử: đủ ô như trên màn nắn',
+  thu.soO === (await sp.locator('.slot-box').count()), `${thu.soO} ô`);
+check('xem thử: KHUNG nằm trên cùng, ảnh ở dưới', thu.khungTrenCung === true);
+check('xem thử: đúng tỉ lệ file khung',
+  Math.abs(thu.tiLe - thu.tiLeFile) / thu.tiLeFile < 0.02,
+  `${thu.tiLe.toFixed(3)} vs ${thu.tiLeFile.toFixed(3)}`);
+check('xem thử: ô đặt đúng chỗ như trên màn nắn', thu.lechToaDo < 0.02,
+  `lệch ${(thu.lechToaDo * 100).toFixed(1)}%`);
+
+// Kho giay phai noi ra bang cm: inch thi nhan vien khong hinh dung duoc
+const chuKho = (await sp.locator('.preview-info').textContent()) ?? '';
+check('nói khổ giấy bằng cm, không chỉ inch', /\d+,\d\s*×\s*\d+,\d\s*cm/.test(chuKho),
+  chuKho.slice(0, 60));
+
 await sp.click('.preview-actions .ghost');
 await sp.waitForTimeout(300);
 

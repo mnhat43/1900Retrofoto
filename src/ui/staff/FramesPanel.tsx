@@ -28,6 +28,52 @@ const MAX_INCH = 12;
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
+/** inch -> cm, một số lẻ, dấu phẩy thập phân như cách viết ở Việt Nam. */
+const cm = (inch: number) => (inch * 2.54).toFixed(1).replace('.', ',');
+
+/**
+ * Xem thử khung như khách sẽ thấy: ảnh lọt qua các lỗ, khung đè lên trên.
+ *
+ * Vì sao cần: màn nắn ô vẽ ô thành nét đứt ĐÈ LÊN khung, tức là ngược hẳn thứ
+ * tự lúc render thật. Nhìn nó thì biết ô nằm đâu, nhưng không biết tấm ảnh
+ * cuối cùng ra sao — mà đó mới là thứ khách nhận.
+ *
+ * Xếp lớp bằng CSS chứ không vẽ canvas: khung đã là PNG có lỗ trong suốt sẵn,
+ * nên chỉ cần đặt các ô ảnh mẫu XUỐNG DƯỚI rồi phủ ảnh khung lên trên là ra
+ * đúng kết quả, không phải nạp bitmap hay dựng lại phép ghép.
+ *
+ * Ảnh mẫu là dải màu chuyển, mỗi ô một sắc: đủ để thấy "chỗ này lọt ảnh" và
+ * phân biệt được các ô, mà không giả vờ là ảnh thật của khách.
+ */
+function XemThu({ src, slots, ratio }: {
+  src: string;
+  slots: Array<{ x: number; y: number; w: number; h: number }>;
+  ratio: number;
+}) {
+  return (
+    <div className="frame-try" style={{ aspectRatio: `${ratio}` }}>
+      {slots.map((s, i) => {
+        const h = (i * 47 + 18) % 360;
+        return (
+          <span
+            key={i}
+            className="frame-try-o"
+            style={{
+              left: `${s.x * 100}%`,
+              top: `${s.y * 100}%`,
+              width: `${s.w * 100}%`,
+              height: `${s.h * 100}%`,
+              background: `linear-gradient(150deg, hsl(${h} 58% 78%), hsl(${h} 42% 58%))`,
+            }}
+          />
+        );
+      })}
+      {/* Khung phủ lên trên cùng — đúng thứ tự lúc render thật */}
+      <img src={src} alt="" draggable={false} />
+    </div>
+  );
+}
+
 export default function FramesPanel() {
   const [frames, setFrames] = useState<ApiFrame[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -332,7 +378,12 @@ export default function FramesPanel() {
                   onChange={(e) => setPending({ ...pending, label: e.target.value })}
                 />
 
-                <label className="field-label">Khổ in (inch)</label>
+                {/*
+                  Nhãn phải nói KHỔ GIẤY, không chỉ "khổ in": nhân viên không
+                  đoán được con số này để làm gì, mà nó quyết định ảnh xuất ra
+                  bao nhiêu pixel nên gõ sai là in ra sai cỡ.
+                */}
+                <label className="field-label">Khổ giấy in (inch)</label>
                 <div className="size-row">
                   <input
                     className="text-input" type="number" step="0.25"
@@ -365,12 +416,19 @@ export default function FramesPanel() {
                   </p>
                 )}
 
+                {/*
+                  Quy đổi ra cm vì inch không ai hình dung ra được: "2×6 inch"
+                  không nói lên gì, "5,1 × 15,2 cm" thì đo được bằng thước ngay
+                  trên tờ giấy ảnh đang dùng ở quán.
+                */}
                 <p className="muted small">
-                  File {pending.analysis.width}×{pending.analysis.height}px · xuất ra{' '}
+                  Tờ ảnh in ra sẽ to <b>{cm(pending.analysis.widthInch)} ×{' '}
+                  {cm(pending.analysis.heightInch)} cm</b>, tức{' '}
                   {Math.round(pending.analysis.widthInch * 300)}×
                   {Math.round(pending.analysis.heightInch * 300)}px ở 300 DPI.
                 </p>
                 <p className="muted small">
+                  File khung {pending.analysis.width}×{pending.analysis.height}px.
                   Kiểm tra các ô đánh số có trùng lỗ trên khung không rồi hãy lưu.
                 </p>
 
@@ -381,6 +439,26 @@ export default function FramesPanel() {
                   </p>
                 )}
 
+                {/*
+                  Xem thử đặt ở ĐÁY CỘT PHẢI, chỗ trước đây bỏ trống.
+                  Cột ảnh bên trái luôn cao hơn cột chữ (khung dải dọc cao gấp
+                  ba bề rộng), nên chỗ này vốn là khoảng trắng thừa. Nhét bản
+                  xem thử vào vừa lấp được nó, vừa cho hai cách nhìn cạnh nhau:
+                  bên trái là ô đang nắn, bên phải là thứ khách sẽ nhận.
+                */}
+                {pending.analysis.slots.length > 0 && (
+                  <div className="frame-try-wrap">
+                    <span className="field-label">Khách sẽ thấy thế này</span>
+                    <XemThu
+                      src={pending.url}
+                      slots={pending.analysis.slots}
+                      ratio={pending.analysis.width / pending.analysis.height}
+                    />
+                    <span className="muted small">
+                      Vùng màu là chỗ ảnh khách lọt qua
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/*
