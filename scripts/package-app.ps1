@@ -142,7 +142,7 @@ function Write-BatFile([string]$Path, [string]$Text) {
 foreach ($s in @(
     "lib-net.ps1", "setup-gui.ps1", "theo-doi.ps1",
     "kiem-tra.ps1", "sua-ip.ps1", "dat-ip-tinh.ps1", "khoi-dong-lai.ps1",
-    "cap-nhat.ps1", "go-cai-dat.ps1"
+    "cap-nhat.ps1", "go-cai-dat.ps1", "cai-agent.ps1"
   )) {
   Copy-Item (Join-Path $PSScriptRoot $s) $OutDir -Force
 }
@@ -182,6 +182,32 @@ if not exist ".env.local" exit /b 1
 if not exist "logs" mkdir "logs"
 runtime\node.exe --experimental-strip-types --disable-warning=ExperimentalWarning server\index.ts > "logs\lan-chay-cuoi.log" 2>&1
 '@ | ForEach-Object { Write-BatFile (Join-Path $OutDir "Chay-server-am-tham.cmd") $_ }
+
+# --- Agent: ban co cua so (doc loi) va ban chay ngam (Task Scheduler) ---
+#
+# Chay-agent.cmd CO pause de nhan vien doc duoc thong bao loi.
+# Chay-agent-am-tham.cmd TUYET DOI KHONG co pause: tac vu chay khong co
+# ai bam phim, pause se treo mai va Windows van thay "dang chay" nen co
+# che tu bat lai khong bao gio kich hoat.
+@'
+@echo off
+chcp 65001 >nul
+cd /d "%~dp0"
+echo.
+echo   Agent lay anh tu cac may phong
+echo   De cua so nay mo. Dong la agent dung.
+echo.
+runtime
+ode.exe --experimental-strip-types --disable-warning=ExperimentalWarning agentwatcher.ts
+pause
+'@ | ForEach-Object { Write-BatFile (Join-Path $OutDir "Chay-agent.cmd") $_ }
+
+@'
+@echo off
+cd /d "%~dp0"
+start "" /b runtime
+ode.exe --experimental-strip-types --disable-warning=ExperimentalWarning agentwatcher.ts
+'@ | ForEach-Object { Write-BatFile (Join-Path $OutDir "Chay-agent-am-tham.cmd") $_ }
 
 Write-Host "  [ok] Da tao file khoi dong"
 
@@ -223,12 +249,14 @@ foreach ($pair in @(
     @("DAT-IP-TINH.bat", "dat-ip-tinh.ps1", $true),
     # Chay tu goi MOI vua giai nen, tro sang ban cu dang chay de thay file
     @("CAP-NHAT.bat", "cap-nhat.ps1", $true),
-    @("GO-CAI-DAT.bat", "go-cai-dat.ps1", $true)
+    @("GO-CAI-DAT.bat", "go-cai-dat.ps1", $true),
+    # Dang ky agent chay ngam, khoi phai de cua so den mo suot
+    @("CAI-AGENT.bat", "cai-agent.ps1", $true)
   )) {
   $tpl = if ($pair[2]) { $elevated } else { $plain }
   Write-BatFile (Join-Path $OutDir $pair[0]) $tpl.Replace('__SCRIPT__', $pair[1])
 }
-Write-Host "  [ok] Da tao KIEM-TRA / KHOI-DONG-LAI / SUA-IP / DAT-IP-TINH / CAP-NHAT / GO-CAI-DAT"
+Write-Host "  [ok] Da tao KIEM-TRA / KHOI-DONG-LAI / SUA-IP / DAT-IP-TINH / CAP-NHAT / GO-CAI-DAT / CAI-AGENT"
 
 # --- 10. Loi tat mo trang quan ly ---
 #
