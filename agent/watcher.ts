@@ -108,6 +108,26 @@ const markSent = (key: string, room: string, path: string) =>
   db.prepare('INSERT OR REPLACE INTO sent (key, room, path, sent_at) VALUES (?,?,?,?)')
     .run(key, room, path, Date.now());
 
+/**
+ * Gói nhiều lần ghi vào một transaction.
+ *
+ * Lúc khởi động ta đánh dấu TOÀN BỘ ảnh cũ là đã xử lý — thư mục thật có
+ * hàng chục nghìn file. Mỗi INSERT rời là một lần ép ghi đĩa, 15.000 file
+ * mất hơn một phút MỖI PHÒNG và agent trông như bị treo. Gói lại còn dưới
+ * một giây.
+ */
+function inTransaction<T>(fn: () => T): T {
+  db.exec('BEGIN');
+  try {
+    const out = fn();
+    db.exec('COMMIT');
+    return out;
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch { /* đã hỏng thì thôi */ }
+    throw err;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Gửi ảnh
 // ---------------------------------------------------------------------------
@@ -162,7 +182,8 @@ async function handleFile(room: string, path: string): Promise<void> {
 
     const data = await readFile(path);
     const res = await fetch(
-      `${CONFIG.server}/api/capture?room=${encodeURIComponent(room)}&source=agent`,
+      `${CONFIG.server}/api/capture?room=${encodeURIComponent(room)}` +
+        `&source=agent&mtime=${Math.round(info.mtimeMs)}`,
       {
         method: 'POST',
         headers: { 'content-type': MIME[extname(name).toLowerCase()] ?? 'image/jpeg' },
@@ -182,6 +203,16 @@ async function handleFile(room: string, path: string): Promise<void> {
       log(`phòng ${room}: chưa nhập mã, chờ ${name}`);
       return;
     }
+    /*
+     * Ảnh của lượt chụp TRƯỚC về trễ (server biết nhờ trigger LumaBooth).
+     * Đánh dấu đã gửi: thử lại cũng vô ích, và để nó treo thì ảnh sẽ chảy
+     * vào khách kế tiếp — đúng thứ trigger sinh ra để ngăn.
+     */
+    if (body.reason === 'stale') {
+      markSent(key, room, path);
+      log(`phòng ${room}: ${name} thuộc lượt trước, bỏ qua`);
+      return;
+    }
     // Đủ ảnh rồi -> đánh dấu để khỏi thử lại mãi
     if (body.reason === 'full') {
       markSent(key, room, path);
@@ -196,8 +227,18 @@ async function handleFile(room: string, path: string): Promise<void> {
   }
 }
 
-/** Quét thư mục để tìm ảnh mới xuất hiện mà sự kiện watch có thể bỏ sót. */
-async function scan(room: string, dir: string, markOnly = false): Promise<void> {
+/**
+ * Quét thư mục để tìm ảnh mới xuất hiện mà sự kiện watch có thể bỏ sót.
+ *
+ * Tham số collect chỉ dùng cho lượt đánh dấu lúc khởi động: gom kết quả lại để
+ * người gọi ghi một thể trong một transaction, thay vì ghi từng file.
+ */
+async function scan(
+  room: string,
+  dir: string,
+  markOnly = false,
+  collect?: Array<{ key: string; room: string; path: string }>,
+): Promise<void> {
   let entries: Awaited<ReturnType<typeof readdir>>;
   try {
     entries = await readdir(dir, { withFileTypes: true });
@@ -208,7 +249,7 @@ async function scan(room: string, dir: string, markOnly = false): Promise<void> 
   for (const e of entries) {
     const p = join(dir, e.name);
     if (e.isDirectory()) {
-      if (CONFIG.watchSubfolders) await scan(room, p, markOnly);
+      if (CONFIG.watchSubfolders) await scan(room, p, markOnly, collect);
       continue;
     }
     if (!IMAGE_EXT.has(extname(e.name).toLowerCase())) continue;
@@ -218,7 +259,9 @@ async function scan(room: string, dir: string, markOnly = false): Promise<void> 
       // để thư mục có sẵn hàng nghìn ảnh cũ không bị vụt hết vào phiên đang mở.
       try {
         const st = await stat(p);
-        markSent(fileKey(p, st.size, st.mtimeMs), room, p);
+        const key = fileKey(p, st.size, st.mtimeMs);
+        if (collect) collect.push({ key, room, path: p });
+        else markSent(key, room, p);
       } catch { /* bỏ qua */ }
     } else {
       void handleFile(room, p);
@@ -253,8 +296,12 @@ async function main() {
       void scan(room, dir);
     } else {
       // Đánh dấu ảnh cũ là đã xử lý -> chỉ gửi ảnh xuất hiện từ giờ trở đi
-      await scan(room, dir, true);
-      console.log(`  [ok] phòng ${room}: ${dir}`);
+      const found: Array<{ key: string; room: string; path: string }> = [];
+      await scan(room, dir, true, found);
+      inTransaction(() => {
+        for (const f of found) markSent(f.key, f.room, f.path);
+      });
+      console.log(`  [ok] phòng ${room}: ${dir}  (${found.length} ảnh có sẵn, sẽ không gửi)`);
     }
 
     watch(dir, { recursive: CONFIG.watchSubfolders }, (_e, filename) => {

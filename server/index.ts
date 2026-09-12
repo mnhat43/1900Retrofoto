@@ -29,6 +29,7 @@ import {
   deleteFrame, seedBuiltins,
 } from './frames.ts';
 import type { DetectedSlot } from './detect.ts';
+import { handleTrigger, shotFloor } from './trigger.ts';
 import { renderFromOriginals, type Recipe } from './render.ts';
 import { listPresets, createPreset, updatePreset, deletePreset } from './presets.ts';
 import { runCleanup, cleanupTiers, purgeOlderThan, CLEANUP_TIERS } from './cleanup.ts';
@@ -549,6 +550,39 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
   }
 
   /**
+   * LumaBooth báo sự kiện trong lượt chụp.
+   *
+   * Khai ở Settings > General > Triggers trên từng máy phòng:
+   *   http://<máy chủ>:8090/api/trigger?room=1
+   *
+   * LumaBooth tự thêm event_type và param1..param4. Nhận GET (LumaBooth
+   * gọi bằng GET), không đòi mật khẩu nhân viên: nó gọi từ máy phòng
+   * trong mạng nội bộ và chỉ ghi nhận mốc thời gian, không sửa dữ liệu.
+   *
+   * Luôn trả 200 kể cả khi phòng sai hay sự kiện lạ — LumaBooth không
+   * cần biết, và ta không muốn nó kẹt vì app.
+   */
+  if (path === '/api/trigger' && method === 'GET') {
+    const room = url.searchParams.get('room') ?? '';
+    const event = url.searchParams.get('event_type') ?? '';
+    /*
+     * LumaBooth gửi mỗi ảnh một param — một lượt 10 kiểu là param1..param11.
+     * Gom hết param* thay vì cố định số lượng.
+     */
+    const params: Record<string, string> = {};
+    for (const [k, v] of url.searchParams) {
+      if (k.startsWith('param') && v) params[k] = v;
+    }
+
+    if (CONFIG.rooms.includes(room) && event) {
+      const r = handleTrigger(room, event, params);
+      logLine(`trigger phòng ${room}: ${event} — ${r.note}`);
+    }
+    json(res, 200, { ok: true });
+    return true;
+  }
+
+  /**
    * Nhận ảnh. HỢP ĐỒNG dùng chung cho upload thủ công (giai đoạn này) và
    * app PC điều khiển Canon (sau này) — chỉ khác tham số `source`.
    */
@@ -556,6 +590,19 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     const room = url.searchParams.get('room') ?? '';
     const s = activeForRoom(room);
     if (!s) { json(res, 409, { error: 'Phòng chưa mở khoá' }); return true; }
+
+    /*
+     * Ảnh chụp TRƯỚC khi LumaBooth mở lượt này là của khách trước về trễ.
+     * Chỉ lọc khi có trigger (shotFloor khác null) — không có trigger thì
+     * giữ nguyên hành vi cũ, agent vẫn chạy được một mình.
+     */
+    const floor = shotFloor(room);
+    const mtime = Number(url.searchParams.get('mtime') ?? 0);
+    if (floor !== null && mtime > 0 && mtime < floor) {
+      logLine(`phòng ${room}: bỏ ảnh cũ hơn lượt chụp hiện tại`);
+      json(res, 409, { error: 'Ảnh thuộc lượt chụp trước', reason: 'stale' });
+      return true;
+    }
 
     try {
       const data = await readBody(req);
