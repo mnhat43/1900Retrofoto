@@ -114,9 +114,33 @@ const fileKey = (path: string, size: number, mtimeMs: number) =>
 const alreadySent = (key: string) =>
   db.prepare('SELECT 1 FROM sent WHERE key = ?').get(key) !== undefined;
 
-const markSent = (key: string, room: string, path: string) =>
+/**
+ * Đường dẫn đã xử lý xong, giữ trong BỘ NHỚ.
+ *
+ * Vòng quét định kỳ gọi handleFile cho MỌI ảnh trong thư mục, kể cả hàng
+ * chục nghìn ảnh cũ. Trước đây mỗi ảnh đều phải qua waitUntilStable — 4 lần
+ * stat() qua SMB, chờ 900ms — RỒI mới hỏi "gửi rồi à?". Với 25.000 ảnh là
+ * ~100.000 lần stat() mỗi 10 giây, và máy chủ giật vì kẹt I/O mạng.
+ *
+ * Set này chặn ngay từ đầu, không chạm đĩa. Nhớ theo đường dẫn chứ không
+ * theo fileKey vì fileKey cần stat() mới tính được — đúng thứ ta muốn tránh.
+ * Đổi tên file thành đường dẫn khác thì coi là ảnh mới, và đó là hành vi
+ * đúng: file mới xuất hiện ở chỗ mới thì phải xét lại.
+ */
+const daXuLy = new Set<string>();
+
+/**
+ * Ghi nhận đã xử lý xong: vào DB (sống qua lần khởi động sau) và vào bộ nhớ
+ * (để vòng quét sau chặn được mà không chạm đĩa).
+ *
+ * Gộp hai việc vào một hàm để không bao giờ sót một nửa — quên cập nhật bộ
+ * nhớ là agent quay lại quét đi quét lại toàn bộ thư mục như trước.
+ */
+const markSent = (key: string, room: string, path: string) => {
+  daXuLy.add(path);
   db.prepare('INSERT OR REPLACE INTO sent (key, room, path, sent_at) VALUES (?,?,?,?)')
     .run(key, room, path, Date.now());
+};
 
 /**
  * Gói nhiều lần ghi vào một transaction.
@@ -180,6 +204,8 @@ async function waitUntilStable(
 async function handleFile(room: string, path: string): Promise<void> {
   const name = basename(path);
   if (!IMAGE_EXT.has(extname(name).toLowerCase())) return;
+  // Chặn TRƯỚC khi chạm đĩa — xem chú thích ở daXuLy.
+  if (daXuLy.has(path)) return;
   if (inFlight.has(path)) return;
   inFlight.add(path);
 
