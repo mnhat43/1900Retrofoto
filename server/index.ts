@@ -10,6 +10,7 @@ import { getDb } from './db.ts';
 import {
   createSession, claimSession, getByToken, activeForRoom, roomDisplaySession,
   listSessions, setStatus, cancelSession, isLockedOut, getById,
+  sessionsOnDay, daysWithSessions, setPrice,
   closeSession, busySession, sessionByAnyToken, openSessionsForRoom, pendingForRoom,
   LIVE_STATUSES,
 } from './session.ts';
@@ -32,6 +33,7 @@ import type { DetectedSlot } from './detect.ts';
 import { handleTrigger, shotFloor, listenTriggerPorts } from './trigger.ts';
 import { renderFromOriginals, type Recipe } from './render.ts';
 import { listPresets, createPreset, updatePreset, deletePreset } from './presets.ts';
+import { listPrices, createPrice, updatePrice, deletePrice, getPrice } from './prices.ts';
 import { runCleanup, cleanupTiers, purgeOlderThan, CLEANUP_TIERS } from './cleanup.ts';
 import { intakeFromFolder, ensureCaptureDir, captureEnabled, captureDir } from './intake.ts';
 import { diskInfo } from './disk.ts';
@@ -196,9 +198,55 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     return true;
   }
 
+  /*
+   * Thống kê một ngày.
+   *
+   * Lọc theo NGÀY TẠO MÃ (lúc thu tiền), không phải ngày chụp xong — khách
+   * chụp qua nửa đêm mà tính sang ngày sau thì doanh thu cả hai ngày đều sai.
+   *
+   * Tổng chỉ cộng phiên CÓ giá. Phiên cũ (price_amount null) không được coi
+   * là 0 đồng, vì thế thì những ngày trước khi có tính năng này trông như
+   * quán không bán được gì.
+   */
+  if (path === '/api/staff/stats' && method === 'GET') {
+    if (requireStaff(ctx)) return true;
+    const day = url.searchParams.get('day') || todayStamp();
+    const rows = sessionsOnDay(day);
+    const coGia = rows.filter((r) => r.price_amount != null);
+    json(res, 200, {
+      day,
+      days: daysWithSessions(),
+      sessions: rows.map((r) => ({
+        ...publicSession(r),
+        photos: countPhotos(r.id),
+        composites: listComposites(r.id).length,
+      })),
+      total: coGia.reduce((n, r) => n + (r.price_amount ?? 0), 0),
+      counted: coGia.length,
+      missing: rows.length - coGia.length,
+    });
+    return true;
+  }
+
+  /*
+   * Đổi giá phiên đã tạo. Cho sửa cả phiên đã đóng: ghi sai thì phải sửa
+   * được, không thì sổ sách lệch vĩnh viễn.
+   */
+  if (path.match(/^\/api\/staff\/sessions\/[^/]+\/price$/) && method === 'POST') {
+    if (requireStaff(ctx)) return true;
+    const body = await readJson<{ priceId?: string | null }>(req);
+    const chosen = body.priceId ? getPrice(String(body.priceId)) : null;
+    if (body.priceId && !chosen) { json(res, 404, { error: 'Không tìm thấy gói' }); return true; }
+    const ok = setPrice(path.split('/')[4], chosen?.amount ?? null, chosen?.label ?? null);
+    json(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Không tìm thấy phiên' });
+    return true;
+  }
+
   if (path === '/api/staff/sessions' && method === 'POST') {
     if (requireStaff(ctx)) return true;
-    const body = await readJson<{ maxPhotos?: number; note?: string; room?: string }>(req);
+    const body = await readJson<{
+      maxPhotos?: number; note?: string; room?: string; priceId?: string;
+    }>(req);
     /*
      * Trần ảnh lấy từ THIẾT LẬP, không phải nhân viên chọn từng phiên —
      * quán không bán gói theo số kiểu nữa, ảnh chụp được bao nhiêu tính bấy
@@ -230,7 +278,23 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
       return true;
     }
 
-    const s = createSession({ maxPhotos, note: body.note, roomId });
+    /*
+     * Chốt SỐ TIỀN vào phiên, không lưu khoá tới gói.
+     *
+     * Quán sửa hay xoá gói sau này là chuyện thường, mà doanh thu đã ghi
+     * của những ngày trước thì không được đổi theo.
+     *
+     * Không chọn gói -> để trống, hiện dấu gạch ở thống kê. Khác hẳn với
+     * bán 0 đồng.
+     */
+    const chosen = body.priceId ? getPrice(String(body.priceId)) : null;
+    const s = createSession({
+      maxPhotos,
+      note: body.note,
+      roomId,
+      priceAmount: chosen?.amount ?? null,
+      priceLabel: chosen?.label ?? null,
+    });
     // Tao san thu muc chup de nhan vien tro phan mem Canon vao ngay
     const dir = ensureCaptureDir(s.code);
     json(res, 200, {
@@ -487,6 +551,46 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
   if (path.match(/^\/api\/staff\/color-presets\/[^/]+$/) && method === 'DELETE') {
     if (requireStaff(ctx)) return true;
     const ok = deletePreset(path.split('/')[4]);
+    json(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Không tìm thấy' });
+    return true;
+  }
+
+  // ---- Gói giá ----
+  //
+  // Chỉ nhân viên xem và sửa. Khách không cần biết bảng giá qua API.
+  if (path === '/api/staff/prices' && method === 'GET') {
+    if (requireStaff(ctx)) return true;
+    json(res, 200, { prices: listPrices() });
+    return true;
+  }
+
+  if (path === '/api/staff/prices' && method === 'POST') {
+    if (requireStaff(ctx)) return true;
+    const body = await readJson<{ label?: string; amount?: unknown }>(req);
+    try {
+      json(res, 200, { price: createPrice(String(body.label ?? ''), body.amount) });
+    } catch (e) {
+      json(res, 400, { error: e instanceof Error ? e.message : 'Không lưu được' });
+    }
+    return true;
+  }
+
+  if (path.match(/^\/api\/staff\/prices\/[^/]+$/) && method === 'PATCH') {
+    if (requireStaff(ctx)) return true;
+    const body = await readJson<{ label?: string; amount?: unknown; enabled?: boolean }>(req);
+    try {
+      const pr = updatePrice(path.split('/')[4], body);
+      if (!pr) { json(res, 404, { error: 'Không tìm thấy' }); return true; }
+      json(res, 200, { price: pr });
+    } catch (e) {
+      json(res, 400, { error: e instanceof Error ? e.message : 'Không sửa được' });
+    }
+    return true;
+  }
+
+  if (path.match(/^\/api\/staff\/prices\/[^/]+$/) && method === 'DELETE') {
+    if (requireStaff(ctx)) return true;
+    const ok = deletePrice(path.split('/')[4]);
     json(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Không tìm thấy' });
     return true;
   }
@@ -837,6 +941,18 @@ function sendFile(res: import('node:http').ServerResponse, abs: string): void {
 // Chuyển đổi cho client (không bao giờ lộ access_token qua danh sách)
 // ---------------------------------------------------------------------------
 
+/**
+ * Hôm nay theo GIỜ MÁY CHỦ, dạng YYYY-MM-DD.
+ *
+ * Không dùng toISOString(): nó trả giờ UTC, mà quán ở múi +7 — sau 5 giờ
+ * chiều là đã nhảy sang ngày hôm sau, và thống kê "hôm nay" trống trơn.
+ */
+function todayStamp(): string {
+  const d = new Date();
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate());
+}
+
 const publicSession = (s: ReturnType<typeof getById> & object) => ({
   id: s.id,
   code: s.code,
@@ -850,6 +966,9 @@ const publicSession = (s: ReturnType<typeof getById> & object) => ({
   /** Lúc phiên kết thúc (nhân viên đóng) — null nếu còn đang mở. */
   doneAt: s.done_at,
   expiresAt: s.expires_at,
+  /** null = phiên tạo trước khi có tính năng giá, KHÁC với bán 0 đồng. */
+  priceAmount: s.price_amount,
+  priceLabel: s.price_label,
 });
 
 const publicPhoto = (p: import('./capture.ts').Photo) => ({

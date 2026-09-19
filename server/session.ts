@@ -49,6 +49,14 @@ export type Session = {
   claimed_at: number | null;
   done_at: number | null;
   purged_at: number | null;
+  /**
+   * Số tiền CHỐT lúc tạo mã, không phải khoá ngoại tới price_options.
+   * Sửa hay xoá gói sau này không được làm đổi doanh thu đã ghi nhận.
+   *
+   * null = phiên tạo trước khi có tính năng giá, không phải bán 0 đồng.
+   */
+  price_amount: number | null;
+  price_label: string | null;
 };
 
 /**
@@ -105,6 +113,9 @@ export function createSession(opts: {
   note?: string;
   /** Phòng mà mã này dành cho. Chỉ phòng đó nhập được mã. */
   roomId?: string;
+  /** Giá bán. Bỏ trống thì phiên không có giá (hiện dấu gạch ở thống kê). */
+  priceAmount?: number | null;
+  priceLabel?: string | null;
 }): Session {
   const db = getDb();
   const t = now();
@@ -127,18 +138,21 @@ export function createSession(opts: {
       claimed_at: null,
       done_at: null,
       purged_at: null,
+      price_amount: opts.priceAmount ?? null,
+      price_label: opts.priceLabel ?? null,
     };
 
     try {
       db.prepare(
         `INSERT INTO sessions
            (id, code, status, max_photos, room_id, access_token, dir, note,
-            code_expires_at, expires_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            code_expires_at, expires_at, created_at, price_amount, price_label)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         session.id, session.code, session.status, session.max_photos,
         session.room_id, session.access_token, session.dir, session.note,
         session.code_expires_at, session.expires_at, session.created_at,
+        session.price_amount, session.price_label,
       );
       return session;
     } catch (err) {
@@ -331,6 +345,63 @@ export function listSessions(limit = 100): Session[] {
   return getDb()
     .prepare('SELECT * FROM sessions ORDER BY created_at DESC LIMIT ?')
     .all(limit) as Session[];
+}
+
+/**
+ * Phiên trong MỘT NGÀY, kèm tổng tiền.
+ *
+ * Lọc theo created_at — ngày nhân viên bấm Tạo mã, tức lúc thu tiền. Không
+ * dùng done_at: khách chụp qua nửa đêm sẽ nhảy sang ngày sau và doanh thu
+ * hai ngày đều sai.
+ *
+ * Mốc ngày theo GIỜ MÁY CHỦ, không phải UTC: quán ở múi +7, dùng UTC thì
+ * "hôm nay" bắt đầu lúc 7 giờ sáng và khách chụp buổi tối bị tính sang
+ * ngày hôm sau.
+ */
+export function sessionsOnDay(day: string): Session[] {
+  const [y, m, d] = day.split('-').map(Number);
+  if (!y || !m || !d) return [];
+  const from = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+  const to = new Date(y, m - 1, d + 1, 0, 0, 0, 0).getTime();
+  return getDb()
+    .prepare(
+      `SELECT * FROM sessions
+        WHERE created_at >= ? AND created_at < ?
+        ORDER BY created_at DESC`,
+    )
+    .all(from, to) as Session[];
+}
+
+/**
+ * Những ngày CÓ phiên, mới nhất trước — để ô chọn ngày chỉ hiện ngày có dữ
+ * liệu thay vì bắt nhân viên mò lịch.
+ */
+export function daysWithSessions(limit = 90): string[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT DISTINCT date(created_at / 1000, 'unixepoch', 'localtime') AS d
+         FROM sessions ORDER BY d DESC LIMIT ?`,
+    )
+    .all(limit) as Array<{ d: string }>;
+  return rows.map((r) => r.d);
+}
+
+/**
+ * Đổi giá của phiên đã tạo.
+ *
+ * Cần vì khách hay đổi gói giữa chừng, và nhân viên cũng chọn nhầm. Cho sửa
+ * cả phiên đã đóng: doanh thu ghi sai thì phải sửa được, không thì sổ sách
+ * lệch vĩnh viễn.
+ */
+export function setPrice(
+  id: string,
+  amount: number | null,
+  label: string | null,
+): boolean {
+  const res = getDb()
+    .prepare('UPDATE sessions SET price_amount = ?, price_label = ? WHERE id = ?')
+    .run(amount, label, id);
+  return res.changes > 0;
 }
 
 export function setStatus(id: string, status: SessionStatus): void {

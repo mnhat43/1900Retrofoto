@@ -142,6 +142,24 @@ function migrate(d: DatabaseSync): void {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- Gói giá nhân viên tự đặt.
+    --
+    -- Chỉ tên và giá, KHÔNG gắn số kiểu ảnh: cùng một số ảnh vẫn có thể bán
+    -- nhiều mức giá khác nhau (khách quen, giờ vắng), và ngược lại.
+    --
+    -- Giá để INTEGER đồng, không phải số thực: tiền Việt không có hào, và số
+    -- thực thì cộng dồn một ngày sẽ lệch những đồng lẻ không ai giải thích nổi.
+    CREATE TABLE IF NOT EXISTS price_options (
+      id         TEXT PRIMARY KEY,
+      label      TEXT NOT NULL,
+      amount     INTEGER NOT NULL,
+      enabled    INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS price_options_enabled
+      ON price_options(enabled, sort_order);
   `);
 
   // --- Nâng cấp database tạo từ bản cũ ---
@@ -150,6 +168,27 @@ function migrate(d: DatabaseSync): void {
   if (!cols.some((c) => c.name === 'source_name')) {
     d.exec('ALTER TABLE photos ADD COLUMN source_name TEXT');
   }
+
+  /*
+   * Giá bán của phiên.
+   *
+   * price_amount là SỐ TIỀN CHỐT lúc tạo mã, không phải khoá ngoại tới
+   * price_options: sửa hay xoá gói sau này không được làm đổi doanh thu đã
+   * ghi nhận của những ngày trước.
+   *
+   * NULL nghĩa là phiên tạo trước khi có tính năng này — hiện dấu gạch ở
+   * bảng và không cộng vào tổng, chứ không phải bán 0 đồng.
+   */
+  const scols = d.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>;
+  if (!scols.some((c) => c.name === 'price_amount')) {
+    d.exec(`
+      ALTER TABLE sessions ADD COLUMN price_amount INTEGER;
+      ALTER TABLE sessions ADD COLUMN price_label TEXT;
+    `);
+  }
+
+  // Thống kê theo ngày lọc trên created_at -> cần chỉ số, không thì quét cả bảng
+  d.exec('CREATE INDEX IF NOT EXISTS sessions_created ON sessions(created_at)');
 
   // Khung tự khai kích thước in -> không bó vào 3 khổ dựng sẵn
   const fcols = d.prepare('PRAGMA table_info(frames)').all() as Array<{ name: string }>;

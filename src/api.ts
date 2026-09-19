@@ -11,6 +11,12 @@ export type SessionInfo = {
   claimedAt: number | null;
   doneAt: number | null;
   expiresAt: number;
+  /**
+   * Số tiền chốt lúc tạo mã. null = phiên tạo trước khi có tính năng giá,
+   * KHÁC với bán 0 đồng — hiện dấu gạch và không cộng vào tổng.
+   */
+  priceAmount?: number | null;
+  priceLabel?: string | null;
 };
 
 export type PhotoInfo = { id: string; seq: number; width: number; height: number };
@@ -103,14 +109,70 @@ export const staffRooms = () =>
  * Không gửi `maxPhotos`: trần ảnh lấy từ thiết lập chung của quán, nhân viên
  * không chọn từng phiên nữa (xem `staffSettings`).
  */
-export const createSession = (room: string) =>
+export const createSession = (room: string, priceId?: string) =>
   req<{
     id: string; code: string; maxPhotos: number;
     room: string; captureDir: string | null;
   }>('/api/staff/sessions', {
     method: 'POST',
-    body: JSON.stringify({ room }),
+    body: JSON.stringify({ room, priceId }),
   });
+
+// --- Gói giá ---
+
+export type PriceInfo = {
+  id: string;
+  label: string;
+  /** Số nguyên đồng. Tiền Việt không có hào. */
+  amount: number;
+  enabled: boolean;
+};
+
+export const staffPrices = () =>
+  req<{ prices: PriceInfo[] }>('/api/staff/prices');
+
+export const createPrice = (label: string, amount: number) =>
+  req<{ price: PriceInfo }>('/api/staff/prices', {
+    method: 'POST',
+    body: JSON.stringify({ label, amount }),
+  });
+
+export const updatePrice = (
+  id: string,
+  patch: { label?: string; amount?: number; enabled?: boolean },
+) =>
+  req<{ price: PriceInfo }>(`/api/staff/prices/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+
+export const deletePrice = (id: string) =>
+  req<{ ok: true }>(`/api/staff/prices/${id}`, { method: 'DELETE' });
+
+/** Đổi giá phiên đã tạo. priceId null = gỡ giá ra. */
+export const setSessionPrice = (sessionId: string, priceId: string | null) =>
+  req<{ ok: true }>(`/api/staff/sessions/${sessionId}/price`, {
+    method: 'POST',
+    body: JSON.stringify({ priceId }),
+  });
+
+// --- Thống kê theo ngày ---
+
+export type DayStats = {
+  /** Ngày đang xem, dạng YYYY-MM-DD. */
+  day: string;
+  /** Những ngày CÓ phiên, mới nhất trước. */
+  days: string[];
+  sessions: Array<SessionInfo & { photos: number; composites: number }>;
+  /** Tổng tiền — chỉ cộng phiên CÓ giá. */
+  total: number;
+  counted: number;
+  /** Số phiên chưa có giá, không tính vào tổng. */
+  missing: number;
+};
+
+export const staffStats = (day?: string) =>
+  req<DayStats>('/api/staff/stats' + (day ? `?day=${encodeURIComponent(day)}` : ''));
 
 export type StaffSettings = {
   /** Trần ảnh áp cho các phiên tạo mới. */

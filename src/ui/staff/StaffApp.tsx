@@ -2,13 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   staffMe, staffLogin, staffLogout, staffSessions, staffRooms, createSession,
   closeSession, staffSessionDetail, photoUrl, compositeUrl, staffDisk, health,
-  ApiError,
+  staffPrices, ApiError,
   type SessionInfo, type PhotoInfo, type CompositeInfo, type RoomStatus,
-  type DiskInfo,
+  type DiskInfo, type PriceInfo,
 } from '../../api';
 import FramesPanel from './FramesPanel';
 import ColorPanel from './ColorPanel';
 import StoragePanel from './StoragePanel';
+import RevenuePanel from './RevenuePanel';
 import QrModal from './QrModal';
 import MaxPhotosSetting from './MaxPhotosSetting';
 import { useDialog } from './useDialog';
@@ -78,7 +79,11 @@ export default function StaffApp() {
   const [room, setRoom] = useState('');
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
-  const [view, setView] = useState<'sessions' | 'frames' | 'colors' | 'storage'>('sessions');
+  const [priceId, setPriceId] = useState('');
+  const [prices, setPrices] = useState<PriceInfo[]>([]);
+  const [view, setView] = useState<
+    'sessions' | 'revenue' | 'frames' | 'colors' | 'storage'
+  >('sessions');
   const [disk, setDisk] = useState<DiskInfo | null>(null);
   /**
    * Phiên bản đang chạy. Đọc một lần lúc mở trang — chỉ đổi khi cập nhật,
@@ -94,9 +99,13 @@ export default function StaffApp() {
 
   const load = useCallback(async () => {
     try {
-      const [s, r] = await Promise.all([staffSessions(), staffRooms()]);
+      const [s, r, pr] = await Promise.all([
+        staffSessions(), staffRooms(), staffPrices(),
+      ]);
       setRows(s.sessions);
       setRooms(r.rooms);
+      // Chỉ gói đang bật — gói đã tắt là quán thôi bán, không được chọn nữa
+      setPrices(pr.prices.filter((x) => x.enabled));
       // Tự chọn phòng rảnh đầu tiên nếu chưa chọn hoặc phòng đang chọn đã bận
       setRoom((cur) => {
         const stillFree = r.rooms.find((x) => x.id === cur && !x.busy);
@@ -113,6 +122,16 @@ export default function StaffApp() {
     });
     health().then((r) => setVersion(r.version)).catch(() => {});
   }, [load]);
+
+  /*
+   * Nạp lại ngay khi quay về tab này, không đợi vòng 4 giây.
+   *
+   * Bảng giá sửa ở tab Doanh thu, nên vừa thêm gói xong bấm sang đây mà ô
+   * chọn gói vẫn trống thì nhân viên tưởng thêm hụt và thêm lần nữa.
+   */
+  useEffect(() => {
+    if (view === 'sessions' && loggedIn) load();
+  }, [view, loggedIn, load]);
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -147,7 +166,15 @@ export default function StaffApp() {
     setBusy(true);
     setError('');
     try {
-      await createSession(room);
+      await createSession(room, priceId || undefined);
+      /*
+       * Bỏ chọn gói sau mỗi lần tạo.
+       *
+       * Không reset thì khách sau vô tình bị gắn giá của khách trước — nhân
+       * viên tạo mã liên tiếp cả ngày, và giá đã chọn không đập vào mắt như
+       * nút "Tạo mã". Sổ sách sai mà không ai thấy lúc nào.
+       */
+      setPriceId('');
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không tạo được mã');
@@ -237,6 +264,12 @@ export default function StaffApp() {
             Phiên chụp
           </button>
           <button
+            className={view === 'revenue' ? 'on' : ''}
+            onClick={() => setView('revenue')}
+          >
+            Doanh thu
+          </button>
+          <button
             className={view === 'frames' ? 'on' : ''}
             onClick={() => setView('frames')}
           >
@@ -282,7 +315,8 @@ export default function StaffApp() {
         </div>
       </header>
 
-      {view === 'frames' ? <FramesPanel />
+      {view === 'revenue' ? <RevenuePanel />
+        : view === 'frames' ? <FramesPanel />
         : view === 'colors' ? <ColorPanel />
         : view === 'storage' ? <StoragePanel /> : (
       <div className="cols">
@@ -371,6 +405,31 @@ export default function StaffApp() {
                 </button>
               ))}
             </div>
+
+            {/*
+              Gói giá. Chỉ hiện khi quán đã đặt bảng giá — quán chưa dùng tính
+              năng này thì không phải nhìn thêm một hàng trống mỗi lần tạo mã.
+
+              Cho bỏ trống: khách chưa chốt gói vẫn tạo mã chụp được, gắn giá
+              sau ở tab Doanh thu.
+            */}
+            {prices.length > 0 && (
+              <>
+                <label className="field-label">Gói giá</label>
+                <div className="pkg-row">
+                  {prices.map((p) => (
+                    <button
+                      key={p.id}
+                      className={p.id === priceId ? 'pkg on' : 'pkg'}
+                      onClick={() => setPriceId(p.id === priceId ? '' : p.id)}
+                    >
+                      {p.label}
+                      <em>{p.amount.toLocaleString('vi-VN')}đ</em>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             {error && <p className="error">{error}</p>}
             <button className="primary" disabled={!room || busy} onClick={onCreate}>
