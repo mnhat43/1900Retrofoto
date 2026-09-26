@@ -7,7 +7,6 @@ import {
   type DiskInfo, type PriceInfo,
 } from '../../api';
 import FramesPanel from './FramesPanel';
-import ColorPanel from './ColorPanel';
 import StoragePanel from './StoragePanel';
 import RevenuePanel from './RevenuePanel';
 import QrModal from './QrModal';
@@ -82,7 +81,7 @@ export default function StaffApp() {
   const [priceId, setPriceId] = useState('');
   const [prices, setPrices] = useState<PriceInfo[]>([]);
   const [view, setView] = useState<
-    'sessions' | 'revenue' | 'frames' | 'colors' | 'storage'
+    'sessions' | 'revenue' | 'frames' | 'storage'
   >('sessions');
   const [disk, setDisk] = useState<DiskInfo | null>(null);
   /**
@@ -276,12 +275,6 @@ export default function StaffApp() {
             Khung ảnh
           </button>
           <button
-            className={view === 'colors' ? 'on' : ''}
-            onClick={() => setView('colors')}
-          >
-            Chỉnh màu
-          </button>
-          <button
             className={view === 'storage' ? 'on' : ''}
             onClick={() => setView('storage')}
           >
@@ -317,7 +310,6 @@ export default function StaffApp() {
 
       {view === 'revenue' ? <RevenuePanel />
         : view === 'frames' ? <FramesPanel />
-        : view === 'colors' ? <ColorPanel />
         : view === 'storage' ? <StoragePanel /> : (
       <div className="cols">
       <div className="col-left">

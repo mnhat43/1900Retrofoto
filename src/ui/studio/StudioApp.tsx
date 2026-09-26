@@ -1,28 +1,34 @@
 import { useEffect, useState } from 'react';
 import {
-  guestSession, photoUrl, compositeUrl, saveComposite, listFrames, listColorPresets,
+  guestSession, photoUrl, compositeUrl, saveComposite, listFrames,
+  uploadGuestPhoto, ApiError,
   type SessionInfo, type PhotoInfo, type CompositeInfo, type ApiFrame,
-  type ColorPreset,
 } from '../../api';
-import { loadPhotosFromUrls, loadOverlay } from '../../media/assets';
+import { loadPhotosFromUrls, loadOverlay, prepareUpload } from '../../media/assets';
 import { framePx, type FormatId } from '../../core/format';
 import { DEFAULT_COLOR, DEFAULT_CONTENT } from '../../core/types';
-import type { ColorState, Frame, Photo, SlotContent } from '../../core/types';
+import type { Frame, Photo, SlotContent } from '../../core/types';
 import { exportStrip } from '../../render/export';
-import { PRESETS } from '../../render/color';
 import { resetContent } from '../../core/interaction';
 import { clampContent, slackOf, slotRectPx, MIN_ZOOM, MAX_ZOOM } from '../../core/placement';
 import { StripCanvas } from '../StripCanvas';
 import './studio.css';
 
 type Step = 'loading' | 'frame' | 'pick' | 'edit' | 'saved' | 'error';
-type Tool = 'align' | 'color';
+type Tool = 'align' | 'swap';
 
 /**
  * Bước dịch mỗi lần bấm nút mũi tên, trên thang -1..1 của offset.
  * Đủ nhỏ để căn chính xác, đủ lớn để bấm một cái là thấy ảnh nhúc nhích.
  */
 const NUDGE = 0.08;
+
+/**
+ * Chỉnh màu đã bỏ theo yêu cầu của quán: ảnh ghép luôn giữ màu gốc.
+ * Vẫn truyền một ColorState trung tính vì phần vẽ/dựng ảnh dùng chung với
+ * trang khác; isIdentity() ở server thấy trung tính thì bỏ qua bước chỉnh màu.
+ */
+const NO_COLOR = DEFAULT_COLOR;
 
 /**
  * Khung từ server -> khung mà phần render dùng.
@@ -42,10 +48,11 @@ const toFrame = (f: ApiFrame): Frame => ({
 });
 
 export default function StudioApp() {
-  // /c/<token> ghép khung, /v/<token> chỉ xem
-  const parts = location.pathname.split('/').filter(Boolean);
-  const mode = parts[0] ?? 'c';
-  const token = parts[1] ?? '';
+  /*
+   * /c/<token>. Link /v/<token> của mã "xem ảnh" cũ (đã bỏ) cũng mở vào đây
+   * và đi thẳng luồng ghép khung — khách còn giữ QR cũ không bị ra trang lỗi.
+   */
+  const token = location.pathname.split('/').filter(Boolean)[1] ?? '';
 
   const [step, setStep] = useState<Step>('loading');
   const [error, setError] = useState('');
@@ -53,38 +60,33 @@ export default function StudioApp() {
   const [available, setAvailable] = useState<PhotoInfo[]>([]);
   const [photos, setPhotos] = useState<Map<string, Photo>>(new Map());
   const [frames, setFrames] = useState<Frame[]>([]);
-  const [shopPresets, setShopPresets] = useState<ColorPreset[]>([]);
-  /** Bộ của quán đang chọn — tách riêng vì nó thay cả bộ thông số. */
-  const [shopId, setShopId] = useState<string | null>(null);
   const [frame, setFrame] = useState<Frame | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
   const [contents, setContents] = useState<Map<string, SlotContent>>(new Map());
-  const [color, setColor] = useState<ColorState>(DEFAULT_COLOR);
   const [activeSlot, setActiveSlot] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<HTMLImageElement | null>(null);
   const [busy, setBusy] = useState('');
   const [tool, setTool] = useState<Tool>('align');
+  /** Ô đã chạm đầu tiên khi đổi chỗ — chờ chạm ô thứ hai. */
+  const [swapFrom, setSwapFrom] = useState<string | null>(null);
   const [result, setResult] = useState<{ composite: CompositeInfo; blob: Blob } | null>(null);
+  /** Lời nhắn sau khi tải ảnh từ máy lên (ảnh hỏng, hết chỗ...). Không chặn luồng. */
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     if (!token) { setError('Liên kết không hợp lệ'); setStep('error'); return; }
     // Tải phiên và thư viện khung song song — khung do nhân viên quản lý nên
     // phải hỏi server, không nằm sẵn trong mã nguồn nữa.
-    Promise.all([guestSession(token), listFrames(), listColorPresets()])
-      .then(([r, fr, cp]) => {
+    Promise.all([guestSession(token), listFrames()])
+      .then(([r, fr]) => {
         setSession(r.session);
         setAvailable(r.photos);
         setFrames(fr.frames.map(toFrame));
-        setShopPresets(cp.presets);
-        if (r.photos.length === 0) {
-          setError('Phiên này chưa có ảnh nào');
-          setStep('error');
-        } else {
-          setStep(mode === 'v' ? 'pick' : 'frame');
-        }
+        // Phiên chưa có ảnh vẫn vào được: khách lấy ảnh từ album ở bước chọn ảnh.
+        setStep('frame');
       })
       .catch((e) => { setError(e.message); setStep('error'); });
-  }, [token, mode]);
+  }, [token]);
 
   useEffect(() => {
     if (!frame) return;
@@ -104,6 +106,39 @@ export default function StudioApp() {
       if (cur.length >= frame.slotCount) return cur;
       return [...cur, id];
     });
+  }
+
+  /**
+   * Khách chọn ảnh trong album điện thoại -> gửi lên phiên -> thêm vào lưới.
+   *
+   * Tuần tự từng ảnh: giải nén vài ảnh 12–48MP song song là cách nhanh nhất
+   * làm Safari tự tải lại trang. Ảnh hỏng thì bỏ qua, gửi tiếp ảnh còn lại.
+   */
+  async function addFromAlbum(files: File[]) {
+    if (!files.length) return;
+    setNotice('');
+    const added: string[] = [];
+    let failed = 0;
+    let stop = '';
+    for (let i = 0; i < files.length; i++) {
+      setBusy(`Đang tải ảnh lên ${i + 1}/${files.length}...`);
+      try {
+        const r = await uploadGuestPhoto(token, await prepareUpload(files[i]));
+        added.push(r.photo.id);
+        setAvailable((cur) => [...cur, r.photo]);
+      } catch (e) {
+        // Mất mạng, hết chỗ, phiên đã đóng -> ảnh sau cũng hỏng y hệt, dừng luôn.
+        if (e instanceof ApiError && e.status !== 400) { stop = e.message; break; }
+        failed++;
+      }
+    }
+    setBusy('');
+    // Điền sẵn ảnh vừa thêm vào các ô còn trống — khách tải lên là để dùng ngay.
+    if (frame && added.length) {
+      const n = frame.slotCount;
+      setChosen((cur) => [...cur, ...added.filter((id) => !cur.includes(id))].slice(0, n));
+    }
+    setNotice(stop || (failed ? `${failed} ảnh không đọc được, hãy chọn ảnh khác` : ''));
   }
 
   /** Tải ảnh đã chọn về máy khách rồi vào editor. */
@@ -129,6 +164,7 @@ export default function StudioApp() {
       // Chọn sẵn ô đầu tiên để bảng căn chỉnh không mở ra trong trạng thái trống.
       setActiveSlot(frame.slots[0].id);
       setTool('align');
+      setSwapFrom(null);
       setStep('edit');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không tải được ảnh');
@@ -143,12 +179,12 @@ export default function StudioApp() {
     if (!frame) return;
     setBusy('Đang lưu...');
     try {
-      const state = { frame, contents, photos, color };
+      const state = { frame, contents, photos, color: NO_COLOR };
       const blob = await exportStrip(state, overlay, 'png');
       const page = framePx(frame);
       const recipe = {
         frameId: frame.id,
-        color,
+        color: NO_COLOR,
         slots: [...contents.entries()].map(([slotId, c]) => ({
           slotId, photoId: c.photoId, zoom: c.zoom, offset: c.offset,
         })),
@@ -261,7 +297,6 @@ export default function StudioApp() {
   // ------------------------------------------------------------------
 
   if (step === 'frame') {
-    const usable = frames.filter((f) => f.slotCount <= available.length);
     return (
       <div className="studio fixed">
         <div className="bar">
@@ -271,12 +306,12 @@ export default function StudioApp() {
           <span className="meta">{available.length} ảnh</span>
         </div>
         <div className="body">
-          {usable.length > 0 ? (
+          {frames.length > 0 ? (
             <>
               <p className="lead">Chọn kiểu dải ảnh bạn muốn</p>
               <div className="scroll-area">
               <div className="frame-grid">
-                {usable.map((f) => (
+                {frames.map((f) => (
                   <button key={f.id} className="frame-item" onClick={() => pickFrame(f)}>
                     <span className="frame-thumb">
                       <img src={f.overlaySrc} alt={f.label} />
@@ -292,13 +327,9 @@ export default function StudioApp() {
             <div className="panel" style={{ margin: '40px auto' }}>
               <p className="muted" style={{ textAlign: 'center' }}>
                 {/* Không còn khung nào bật -> đây là việc của nhân viên,
-                    đừng bắt khách đoán. Math.min() của mảng rỗng ra Infinity
-                    nên phải tách hẳn hai trường hợp. */}
-                {frames.length === 0
-                  ? 'Hệ thống đang gặp lỗi, vui lòng liên hệ nhân viên.'
-                  : `Chưa đủ ảnh cho khung nào. Cần ít nhất ${
-                      Math.min(...frames.map((f) => f.slotCount))
-                    } ảnh, hiện có ${available.length}.`}
+                    đừng bắt khách đoán. Khung nhiều ô hơn số ảnh vẫn hiện:
+                    khách bù bằng ảnh trong album ở bước sau. */}
+                Hệ thống đang gặp lỗi, vui lòng liên hệ nhân viên.
               </p>
             </div>
           )}
@@ -308,51 +339,63 @@ export default function StudioApp() {
   }
 
   // ------------------------------------------------------------------
-  // Chọn ảnh / chỉ xem
+  // Chọn ảnh
   // ------------------------------------------------------------------
 
   if (step === 'pick') {
-    const viewOnly = mode === 'v';
     const need = frame?.slotCount ?? 0;
     const done = chosen.length === need;
+    const short = need - available.length;
 
     return (
       <div className="studio fixed">
         <div className="bar">
-          {!viewOnly && (
-            <button className="back" onClick={() => setStep('frame')}>← Khung</button>
-          )}
-          <h1>{viewOnly ? 'Ảnh của bạn' : 'Chọn ảnh'}</h1>
-          {!viewOnly && (
-            <span className="meta" style={{ color: done ? '#15803d' : undefined }}>
-              {chosen.length}/{need}
-            </span>
-          )}
+          <button className="back" onClick={() => setStep('frame')}>← Khung</button>
+          <h1>Chọn ảnh</h1>
+          <span className="meta" style={{ color: done ? '#15803d' : undefined }}>
+            {chosen.length}/{need}
+          </span>
         </div>
 
         <div className="body">
-          {!viewOnly && (
-            <p className="lead">
-              {done
-                ? 'Đã đủ ảnh — bấm Tiếp tục'
+          <p className="lead">
+            {done
+              ? 'Đã đủ ảnh — bấm Tiếp tục'
+              : short > 0
+                ? `Cần thêm ${short} ảnh — bấm "Ảnh trong máy" để lấy từ album`
                 : `Chạm chọn ${need} ảnh theo thứ tự bạn muốn`}
-            </p>
-          )}
+          </p>
+          {notice && <p className="notice-inline">{notice}</p>}
 
           <div className="scroll-area">
           <div className="photo-grid">
+            {/*
+              Ô đầu lưới, không phải nút cuối trang: phiên có 30 ảnh thì nút
+              ở cuối nằm khuất dưới cả màn cuộn, khách không biết là có.
+              accept="image/*" để iPhone mở thẳng Thư viện ảnh và tự đổi
+              HEIC sang định dạng trình duyệt đọc được.
+            */}
+            <label className={busy ? 'photo add off' : 'photo add'}>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                disabled={!!busy}
+                onChange={(e) => {
+                  const files = [...(e.target.files ?? [])];
+                  // Xoá chọn để lần sau chọn lại đúng ảnh ấy vẫn bắn onChange
+                  e.target.value = '';
+                  addFromAlbum(files);
+                }}
+              />
+              <span className="plus">+</span>
+              <span className="add-label">Ảnh trong máy</span>
+            </label>
+
             {available.map((p) => {
               const idx = chosen.indexOf(p.id);
-              return viewOnly ? (
-                <a
-                  key={p.id}
-                  className="photo"
-                  href={`/media/originals/${p.id}?t=${encodeURIComponent(token)}`}
-                  download={`anh-${String(p.seq).padStart(2, '0')}.jpg`}
-                >
-                  <img src={photoUrl(p.id, token)} alt="" loading="lazy" />
-                </a>
-              ) : (
+              return (
                 <button
                   key={p.id}
                   className={idx >= 0 ? 'photo on' : 'photo'}
@@ -366,21 +409,17 @@ export default function StudioApp() {
             })}
           </div>
           </div>
-
-          {viewOnly && <p className="tip">Bấm giữ vào ảnh để lưu về máy</p>}
         </div>
 
-        {!viewOnly && (
-          <div className="actions">
-            <button
-              className="btn btn-primary wide"
-              disabled={!done || !!busy}
-              onClick={startEdit}
-            >
-              {busy || (done ? 'Tiếp tục' : `Còn thiếu ${need - chosen.length} ảnh`)}
-            </button>
-          </div>
-        )}
+        <div className="actions">
+          <button
+            className="btn btn-primary wide"
+            disabled={!done || !!busy}
+            onClick={startEdit}
+          >
+            {busy || (done ? 'Tiếp tục' : `Còn thiếu ${need - chosen.length} ảnh`)}
+          </button>
+        </div>
 
         {busy && (
           <div className="overlay">
@@ -399,7 +438,7 @@ export default function StudioApp() {
   // ------------------------------------------------------------------
 
   if (step === 'edit' && frame) {
-    const stripState = { frame, contents, photos, color };
+    const stripState = { frame, contents, photos, color: NO_COLOR };
     // Luôn có một ô đang chọn để bảng căn chỉnh không bao giờ trống.
     const slotId = activeSlot ?? frame.slots[0].id;
     const active = contents.get(slotId) ?? null;
@@ -433,6 +472,33 @@ export default function StudioApp() {
     const canX = slack.w > 0.5;
     const canY = slack.h > 0.5;
 
+    const swapping = tool === 'swap';
+    const openTool = (t: Tool) => { setTool(t); setSwapFrom(null); };
+
+    /*
+     * Đổi chỗ: chạm ô thứ nhất, rồi ô thứ hai. Chạm lại đúng ô đang chọn là
+     * bỏ chọn.
+     *
+     * Đổi NGUYÊN SlotContent chứ không chỉ photoId: ảnh mang theo cả phần căn
+     * chỉnh của nó, khách đã căn đẹp rồi thì đổi chỗ không mất công căn lại.
+     * zoom/offset là tỉ lệ nên ô khác kích thước vẫn hợp lệ, không hở nền.
+     */
+    const pickSwap = (id: string | null) => {
+      if (!id) return;
+      if (!swapFrom) { setSwapFrom(id); return; }
+      if (id !== swapFrom) {
+        const from = swapFrom;
+        setContents((cur) => {
+          const a = cur.get(from);
+          const b = cur.get(id);
+          if (!a || !b) return cur;
+          return new Map(cur).set(from, b).set(id, a);
+        });
+        setActiveSlot(id);
+      }
+      setSwapFrom(null);
+    };
+
     return (
       // `fixed` khoá chiều cao đúng bằng màn hình để bảng công cụ và nút Lưu
       // luôn nhìn thấy, không bị canvas đẩy ra ngoài.
@@ -448,10 +514,11 @@ export default function StudioApp() {
               fit
               state={stripState}
               overlay={overlay}
-              activeSlot={activeSlot}
-              onActivate={setActiveSlot}
+              activeSlot={swapping ? swapFrom : activeSlot}
+              onActivate={swapping ? pickSwap : setActiveSlot}
               onChange={(slotId, c) => setContents((cur) => new Map(cur).set(slotId, c))}
               onCommit={() => {}}
+              selectOnly={swapping}
             />
           </div>
 
@@ -460,22 +527,57 @@ export default function StudioApp() {
           </p>
 
           <div className="tools">
+            {/* Khung 1 ô thì không có gì để đổi chỗ -> chỉ còn một việc, bỏ luôn thanh tab */}
+            {frame.slots.length > 1 && (
             <div className="tool-tabs">
               <button
                 className={tool === 'align' ? 'on' : ''}
-                onClick={() => setTool('align')}
+                onClick={() => openTool('align')}
               >
                 Căn ảnh
               </button>
               <button
-                className={tool === 'color' ? 'on' : ''}
-                onClick={() => setTool('color')}
+                className={swapping ? 'on' : ''}
+                onClick={() => openTool('swap')}
               >
-                Màu
+                Đổi chỗ
               </button>
             </div>
+            )}
 
-            {tool === 'align' ? (
+            {swapping ? (
+              /*
+               * Hàng ô kèm ảnh thu nhỏ: chạm ở đây hay chạm trên dải đều được.
+               * Dải 9 ô trên màn điện thoại mỗi ô rất bé, chạm hàng này dễ hơn.
+               *
+               * Lời nhắc nằm TRONG bảng chứ không ở dòng .hint: dòng đó bị ẩn
+               * trên điện thoại cho đỡ tốn chỗ, mà ở đây thiếu nó là khách
+               * không biết phải chạm tiếp vào đâu.
+               */
+              <>
+              <p className="pad-tip swap-tip">
+                {swapFrom
+                  ? <>Chạm ô muốn đổi với <b>Ô{frame.slots.findIndex((s) => s.id === swapFrom) + 1}</b></>
+                  : 'Chạm lần lượt 2 ô để đổi chỗ ảnh'}
+              </p>
+              <div className="presets swap-row">
+                {frame.slots.map((s, i) => {
+                  const c = contents.get(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      className={s.id === swapFrom ? 'swap-item on' : 'swap-item'}
+                      onClick={() => pickSwap(s.id)}
+                      aria-label={`Ô ${i + 1}${s.id === swapFrom ? ', đang chọn' : ''}`}
+                    >
+                      {c && <img src={photoUrl(c.photoId, token)} alt="" />}
+                      <span>Ô{i + 1}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              </>
+            ) : (
               <>
                 <div className="presets">
                   {frame.slots.map((s, i) => (
@@ -535,56 +637,6 @@ export default function StudioApp() {
                     Phóng to để dịch được theo chiều {canX ? 'dọc' : 'ngang'}.
                   </p>
                 )}
-              </>
-            ) : (
-              <>
-                <div className="presets">
-                  {/*
-                    Bộ của quán đứng TRƯỚC bộ dựng sẵn — đây là tone quán muốn
-                    khách dùng, nên phải thấy đầu tiên mà không phải vuốt.
-
-                    Chọn bộ của quán = thay TOÀN BỘ thông số (giữ presetId
-                    'none'), không chồng lên bộ dựng sẵn: chồng hai lớp thì
-                    kết quả phụ thuộc thứ tự áp và không đoán được.
-                  */}
-                  {shopPresets.map((p) => {
-                    const on = shopId === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        className={on ? 'chip shop on' : 'chip shop'}
-                        onClick={() => {
-                          setShopId(on ? null : p.id);
-                          setColor(on
-                            ? DEFAULT_COLOR
-                            : { ...DEFAULT_COLOR, ...(p.params as unknown as ColorState) });
-                        }}
-                      >
-                        {p.label}
-                      </button>
-                    );
-                  })}
-                  {PRESETS.map((p) => (
-                    <button
-                      key={p.id}
-                      className={!shopId && color.presetId === p.id ? 'chip on' : 'chip'}
-                      onClick={() => {
-                        setShopId(null);
-                        setColor({ ...DEFAULT_COLOR, presetId: p.id });
-                      }}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="sliders">
-                  <Slider label="Sáng" value={color.brightness}
-                    onChange={(v) => setColor({ ...color, brightness: v })} />
-                  <Slider label="Tương phản" value={color.contrast}
-                    onChange={(v) => setColor({ ...color, contrast: v })} />
-                  <Slider label="Bão hoà" value={color.saturation}
-                    onChange={(v) => setColor({ ...color, saturation: v })} />
-                </div>
               </>
             )}
           </div>

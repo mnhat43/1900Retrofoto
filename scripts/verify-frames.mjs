@@ -173,7 +173,7 @@ check('màn chọn khung chỉ hiện khung đang bật',
 
 await p.click('.frame-item');
 await p.waitForSelector('.photo-grid');
-for (let i = 0; i < 6; i++) await p.click(`.photo >> nth=${i}`);
+for (let i = 0; i < 6; i++) await p.click(`button.photo >> nth=${i}`);
 await p.click('.actions .btn-primary');
 await p.waitForSelector('canvas.strip-canvas', { timeout: 25000 });
 await p.waitForTimeout(700);

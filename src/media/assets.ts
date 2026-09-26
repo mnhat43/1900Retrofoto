@@ -137,6 +137,44 @@ export async function loadPhotosFromUrls(
   return out;
 }
 
+/**
+ * Cạnh dài tối đa của ảnh album gửi lên server.
+ *
+ * 4000px ~ 12MP: vẫn nét cho khổ in lớn nhất, mà nằm dưới trần canvas iOS
+ * (~16.7M điểm ảnh) nên Safari không vẽ ra ảnh trắng.
+ */
+const UPLOAD_MAX_EDGE = 4000;
+
+/**
+ * Chuẩn bị một ảnh trong album điện thoại để gửi lên phiên.
+ *
+ * Luôn vẽ lại thành JPEG thay vì gửi nguyên file:
+ *   - iPhone lưu HEIC, server (sharp) không đọc được — trình duyệt thì đọc được.
+ *   - Xoay theo EXIF ngay ở đây, khỏi phụ thuộc server hiểu EXIF của máy nào.
+ *   - Ảnh 48MP của điện thoại mới gửi qua WiFi quán rất chậm; thu về ~12MP là đủ.
+ */
+export async function prepareUpload(file: File): Promise<Blob> {
+  const source = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  try {
+    const scale = Math.min(1, UPLOAD_MAX_EDGE / Math.max(source.width, source.height));
+    const w = Math.round(source.width * scale);
+    const h = Math.round(source.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(source, 0, 0, w, h);
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/jpeg', 0.92));
+    // Thả bộ nhớ canvas ngay — iOS tính cả canvas đã bỏ vào hạn mức nếu chưa GC.
+    canvas.width = canvas.height = 0;
+    if (!blob) throw new Error('Không đọc được ảnh');
+    return blob;
+  } finally {
+    source.close();
+  }
+}
+
 export function loadOverlay(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();

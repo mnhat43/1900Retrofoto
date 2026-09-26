@@ -790,6 +790,37 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     return true;
   }
 
+  /**
+   * Khách tải ảnh từ album điện thoại lên để ghép khung.
+   *
+   * Lưu thành ảnh THẬT của phiên (originals + previews) chứ không để nằm
+   * riêng trên điện thoại: bước dựng lại ảnh nét ở /api/composites tra ảnh
+   * gốc theo id, ảnh không có trên server thì ô đó ra trắng.
+   */
+  if (path === '/api/s/photos' && method === 'POST') {
+    const s = getByToken(url.searchParams.get('t') ?? '');
+    if (!s) { json(res, 404, { error: 'Liên kết không hợp lệ' }); return true; }
+    try {
+      const data = await readBody(req);
+      if (data.length === 0) { json(res, 400, { error: 'Không có dữ liệu ảnh' }); return true; }
+      const r = await addPhoto(s, data, 'guest');
+      json(res, 200, { photo: publicPhoto(r.photo), remaining: r.remaining });
+    } catch (err) {
+      if (err instanceof CaptureError) {
+        // Thông điệp của addPhoto viết cho máy chụp — khách cần câu khác.
+        const msg = err.code === 'full'
+          ? 'Phiên đã đủ số ảnh tối đa, không thêm được nữa'
+          : err.code === 'bad_image'
+            ? 'Ảnh này không đọc được, hãy chọn ảnh khác'
+            : err.message;
+        json(res, err.code === 'full' ? 409 : 400, { error: msg, reason: err.code });
+      } else {
+        json(res, 400, { error: String((err as Error).message) });
+      }
+    }
+    return true;
+  }
+
   if (path === '/api/composites' && method === 'POST') {
     const s = getByToken(url.searchParams.get('t') ?? '');
     if (!s) { json(res, 404, { error: 'Liên kết không hợp lệ' }); return true; }
@@ -1031,14 +1062,14 @@ export function lanAddress(): string {
 
 async function makeQr(ctx: Ctx, token: string) {
   const host = process.env.PHOTOBOOTH_HOST ?? `${lanAddress()}:${CONFIG.port}`;
-  const view = `http://${host}/v/${token}`;
+  /*
+   * Chỉ còn MỘT mã: ghép khung. Mã "xem ảnh gốc" (/v/) đã bỏ theo yêu cầu
+   * của quán; link /v/ cũ vẫn mở được nhưng đưa thẳng vào luồng ghép khung.
+   */
   const compose = `http://${host}/c/${token}`;
-  const opts = { margin: 1, width: 320 } as const;
   return {
-    viewUrl: view,
     composeUrl: compose,
-    view: await QRCode.toDataURL(view, opts),
-    compose: await QRCode.toDataURL(compose, opts),
+    compose: await QRCode.toDataURL(compose, { margin: 1, width: 320 }),
   };
 }
 

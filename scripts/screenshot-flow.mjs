@@ -75,7 +75,7 @@ await room.waitForFunction(
 await shot(room, 'flow-4-room-shooting');
 
 for (let i = 2; i < 4; i++) writeFileSync(join(shotDir, `IMG_${i + 1}.jpg`), files[i].buffer);
-await room.click('.btn:has-text("Quét lại")');
+await room.click('.btn:has-text("Lấy thêm ảnh")');
 await room.waitForFunction(
   () => document.querySelector('.counter .big')?.textContent?.trim() === '4',
 );
@@ -99,21 +99,22 @@ await shot(phone, 'flow-6-phone-frames');
 
 await phone.click('.frame-item:has-text("Basic 4")');
 await phone.waitForSelector('.photo-grid');
-await phone.click('.photo >> nth=0');
-await phone.click('.photo >> nth=1');
+await phone.click('button.photo >> nth=0');
+await phone.click('button.photo >> nth=1');
 await shot(phone, 'flow-7-phone-pick');
 
-await phone.click('.photo >> nth=2');
-await phone.click('.photo >> nth=3');
+await phone.click('button.photo >> nth=2');
+await phone.click('button.photo >> nth=3');
 await phone.click('.actions .btn-primary');
 await phone.waitForSelector('.strip-canvas');
 await phone.waitForTimeout(800);
 await shot(phone, 'flow-8-phone-edit');
 
-await phone.click('.tool-tabs button:has-text("Màu")');
+await phone.click('.tool-tabs button:has-text("Đổi chỗ")');
+await phone.click('.swap-item >> nth=0');
 await phone.waitForTimeout(300);
-await phone.click('.chip:has-text("Sepia")');
-await phone.waitForTimeout(600);
+await shot(phone, 'flow-8b-phone-swap');
+
 await phone.click('.actions .btn-primary');
 await phone.waitForSelector('.result');
 await phone.waitForTimeout(500);

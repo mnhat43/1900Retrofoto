@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { staffSessionQr, type QrPair } from '../../api';
+import { staffSessionQr, type GuestQr } from '../../api';
 
 interface QrModalProps {
   /** Phiên cần hiện lại QR. */
@@ -10,7 +10,7 @@ interface QrModalProps {
 }
 
 /**
- * Hiện lại hai mã QR của một phiên trên máy nhân viên.
+ * Hiện lại mã QR ghép khung của một phiên trên máy nhân viên.
  *
  * Vì sao cần: màn hình phòng bỏ QR ngay khi nhân viên phát mã cho khách tiếp
  * theo, nên khách cũ đang ngồi ghép ảnh ngoài quán không còn chỗ quét lại.
@@ -20,7 +20,7 @@ interface QrModalProps {
  * thật sự có người xem.
  */
 export default function QrModal({ id, code, onClose }: QrModalProps) {
-  const [qr, setQr] = useState<QrPair | null>(null);
+  const [qr, setQr] = useState<GuestQr | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -51,11 +51,6 @@ export default function QrModal({ id, code, onClose }: QrModalProps) {
               dùng WiFi cửa hàng.
             </p>
             <div className="qr-pair">
-              <div className="qr-item">
-                <img src={qr.view} alt={`QR xem ảnh phiên ${code}`} />
-                <b>Xem ảnh</b>
-                <span className="qr-url">{qr.viewUrl}</span>
-              </div>
               <div className="qr-item">
                 <img src={qr.compose} alt={`QR ghép khung phiên ${code}`} />
                 <b>Ghép khung</b>

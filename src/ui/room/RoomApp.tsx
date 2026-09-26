@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   claimCode, roomSession, finishRoom, intakeRoom,
-  type SessionInfo, type PhotoInfo, type QrPair, type IntakeResult, ApiError,
+  type SessionInfo, type PhotoInfo, type GuestQr, type IntakeResult, ApiError,
 } from '../../api';
 import './room.css';
 
 /**
  * Màn hình phòng chụp — chạy toàn màn hình trên PC của phòng.
  *
- * Trạng thái: KHOÁ (nhập mã) -> ĐANG CHỤP -> XONG (2 mã QR).
+ * Trạng thái: KHOÁ (nhập mã) -> ĐANG CHỤP -> XONG (mã QR ghép khung).
  *
  * Luồng lấy ảnh: mỗi phiên có thư mục riêng đặt tên bằng mã 4 số, tạo sẵn
  * lúc nhân viên tạo mã. Khách chụp xong bấm "Đã chụp xong", server quét đúng
@@ -22,7 +22,7 @@ export default function RoomApp() {
 
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [photos, setPhotos] = useState<PhotoInfo[]>([]);
-  const [qr, setQr] = useState<QrPair | null>(null);
+  const [qr, setQr] = useState<GuestQr | null>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -132,7 +132,7 @@ export default function RoomApp() {
     </header>
   );
 
-  // ---- XONG: hiện 2 mã QR ----
+  // ---- XONG: hiện mã QR ghép khung ----
   if (done && qr) {
     return (
       <div className="room done">
@@ -144,16 +144,15 @@ export default function RoomApp() {
             <p className="lead">Dùng điện thoại quét mã bên dưới</p>
           </div>
 
+          {/*
+            Chỉ một mã: ghép khung. Trong đó khách chọn ảnh vừa chụp hoặc
+            tải thêm ảnh từ album điện thoại.
+          */}
           <div className="qr-row">
-            <div className="qr-card">
-              <img src={qr.view} alt="QR xem ảnh" />
-              <h2>Xem ảnh</h2>
-              <p>Xem lại {photos.length} ảnh vừa chụp</p>
-            </div>
             <div className="qr-card primary">
               <img src={qr.compose} alt="QR ghép khung" />
               <h2>Ghép khung</h2>
-              <p>Chọn khung và tạo dải ảnh</p>
+              <p>Chọn khung, chọn ảnh — có thể lấy thêm ảnh trong máy</p>
             </div>
           </div>
 

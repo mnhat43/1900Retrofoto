@@ -122,7 +122,7 @@ check('màn nhập mã không kèm QR của khách cũ', !afterNew.body.qr);
 /* QR của khách cũ không mất — nhân viên chìa lại được từ trang quản lý. */
 const qrBack = await api(`/api/staff/sessions/${a.body.id}/qr`);
 check('nhân viên hiện lại được QR của khách đang ghép',
-  qrBack.status === 200 && qrBack.body.qr?.view?.startsWith('data:image/'),
+  qrBack.status === 200 && qrBack.body.qr?.compose?.startsWith('data:image/'),
   JSON.stringify(qrBack.body).slice(0, 120));
 check('QR hiện lại đúng phiên', qrBack.body.code === a.body.code);
 
@@ -218,8 +218,8 @@ const qrBtn = p.locator('.composing button.link', { hasText: 'Hiện QR' }).firs
 check('dòng "đang ghép ảnh" có nút hiện lại QR', (await qrBtn.count()) === 1);
 await qrBtn.click();
 await p.waitForSelector('.qr-pair img', { timeout: 5000 });
-check('mở ra đủ hai mã QR (xem ảnh + ghép khung)',
-  (await p.locator('.qr-pair img').count()) === 2);
+check('mở ra đúng một mã QR (ghép khung)',
+  (await p.locator('.qr-pair img').count()) === 1);
 await p.screenshot({ path: 'scratch/rooms-qr-lai.png' });
 await p.locator('.qr-modal header button').click();
 check('đóng được cửa sổ QR', (await p.locator('.qr-modal').count()) === 0);

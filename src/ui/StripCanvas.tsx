@@ -18,6 +18,11 @@ type Props = {
    * cắt mất ô dưới cùng.
    */
   fit?: boolean;
+  /**
+   * Chỉ chọn ô, không kéo/phóng ảnh. Dùng khi đổi chỗ ảnh: khách chạm vào ô
+   * để chọn, nếu vẫn cho kéo thì ngón tay hơi trượt là ảnh xê dịch mất.
+   */
+  selectOnly?: boolean;
 };
 
 /** Khung hiển thị tối đa khi KHÔNG bật `fit` (px CSS). */
@@ -32,6 +37,7 @@ export function StripCanvas({
   onChange,
   onCommit,
   fit = false,
+  selectOnly = false,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number>(0);
@@ -135,7 +141,7 @@ export function StripCanvas({
 
     const slotId = hitSlot(state.frame.slots, p.x, p.y, view.w, view.h);
     onActivate(slotId);
-    if (!slotId || !state.contents.has(slotId)) return;
+    if (selectOnly || !slotId || !state.contents.has(slotId)) return;
 
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { id: e.pointerId, x: p.x, y: p.y, slot: slotId };
@@ -145,6 +151,8 @@ export function StripCanvas({
     if (pointers.current.has(e.pointerId)) {
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     }
+
+    if (selectOnly) return;
 
     // Hai ngón -> pinch zoom
     if (pointers.current.size === 2) {
@@ -196,6 +204,7 @@ export function StripCanvas({
   };
 
   const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    if (selectOnly) return;
     const p = toPage(e);
     const slotId = hitSlot(state.frame.slots, p.x, p.y, view.w, view.h);
     if (!slotId) return;

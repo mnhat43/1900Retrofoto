@@ -317,6 +317,33 @@ body {
   box-shadow: 0 1px 5px rgba(0, 0, 0, .3);
 }
 
+/* Ô "Ảnh trong máy" — nét đứt để phân biệt với ảnh, cùng kích thước để lưới đều. */
+.photo.add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 2px dashed var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-align: center;
+}
+
+.photo.add.off { opacity: .5; pointer-events: none; }
+.photo.add .plus { font-size: 34px; line-height: 1; font-weight: 300; }
+.photo.add .add-label { font-size: 13px; font-weight: 600; padding: 0 4px; }
+
+.notice-inline {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--r);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 13.5px;
+  text-align: center;
+}
+
 /* ---------- Màn chỉnh ảnh ----------
    Ba tầng cố định: canvas co lại vừa chỗ trống, bảng công cụ và nút Lưu
    luôn nhìn thấy mà không phải cuộn. */
@@ -574,6 +601,42 @@ body {
   color: var(--text-3);
 }
 
+/* Đổi chỗ ảnh: mỗi ô một thẻ ảnh nhỏ, thẻ đang chọn viền accent. */
+.swap-row { padding: 2px; }
+.swap-tip { text-align: center; }
+.swap-tip b { color: var(--accent); }
+
+.swap-item {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.swap-item img {
+  width: 58px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 5px;
+  display: block;
+}
+
+.swap-item.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .slot-note {
   display: flex;
   align-items: center;
@@ -791,17 +854,3 @@ body {
   .align-sliders .slider { grid-template-columns: 74px 1fr 40px; }
 }
 
-/*
- * Bộ lọc của quán — nổi bật hơn bộ dựng sẵn.
- * Đây là tone quán muốn khách dùng, nên phải nhận ra ngay giữa 16 chip khác.
- */
-.chip.shop {
-  border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.chip.shop.on {
-  background: var(--accent);
-  color: var(--on-accent);
-}

@@ -49,6 +49,9 @@ export function getPhoto(sessionId: string, photoId: string): Photo | null {
     .get(photoId, sessionId) as Photo | undefined) ?? null;
 }
 
+/** Số ảnh album khách được tải thêm vào một phiên, ngoài trần ảnh chụp. */
+export const GUEST_EXTRA_PHOTOS = 30;
+
 export class CaptureError extends Error {
   // Không dùng parameter property — Node strip-types không hỗ trợ (sinh code runtime)
   code: 'full' | 'closed' | 'bad_image' | 'duplicate';
@@ -105,11 +108,19 @@ function reserveSeq(sessionId: string, maxPhotos: number): { id: string; seq: nu
 export async function addPhoto(
   session: Session,
   data: Buffer,
-  source: 'manual' | 'agent' = 'manual',
+  source: 'manual' | 'agent' | 'guest' = 'manual',
   sourceName?: string,
 ): Promise<{ photo: Photo; count: number; remaining: number }> {
-  if (session.status !== 'active' && session.status !== 'shooting') {
-    throw new CaptureError('Phiên không ở trạng thái chụp', 'closed');
+  /*
+   * Ảnh album của khách ('guest') đến SAU khi chụp xong — lúc khách cầm điện
+   * thoại ra ngoài ghép khung — nên chỉ nhận ở 'done'/'composed'. Ngược lại
+   * máy chụp chỉ được nạp khi phiên còn đang chụp.
+   */
+  const open = source === 'guest'
+    ? session.status === 'done' || session.status === 'composed'
+    : session.status === 'active' || session.status === 'shooting';
+  if (!open) {
+    throw new CaptureError('Phiên không ở trạng thái nhận ảnh', 'closed');
   }
 
   /*
@@ -125,8 +136,15 @@ export async function addPhoto(
     if (dup) throw new CaptureError('Ảnh này đã nạp rồi', 'duplicate');
   }
 
+  /*
+   * Ảnh album có hạn mức RIÊNG cộng thêm trên trần của phiên. Trần kia là lưới
+   * an toàn cho việc quét thư mục chụp; nếu tính chung, khách chụp đủ trần sẽ
+   * không thêm nổi một ảnh album nào.
+   */
+  const limit = source === 'guest' ? session.max_photos + GUEST_EXTRA_PHOTOS : session.max_photos;
+
   // Giữ chỗ TRƯỚC khi xử lý ảnh — xem chú thích ở reserveSeq.
-  const { id, seq } = reserveSeq(session.id, session.max_photos);
+  const { id, seq } = reserveSeq(session.id, limit);
   const db = getDb();
 
   let meta: sharp.Metadata;
@@ -194,7 +212,7 @@ export async function addPhoto(
   }
 
   const count = countPhotos(session.id);
-  return { photo, count, remaining: session.max_photos - count };
+  return { photo, count, remaining: Math.max(0, limit - count) };
 }
 
 /** Tên file preview tương ứng của một ảnh. */

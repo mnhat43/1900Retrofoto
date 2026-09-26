@@ -120,9 +120,10 @@ check('file không phải ảnh bị từ chối',
 
 console.log('\n--- Hoàn tất, sinh QR ---');
 const fin = await api('/api/room/finish?room=1', { method: 'POST' });
-check('sinh được 2 mã QR',
-  fin.body.qr?.view?.startsWith('data:image/png') &&
+check('sinh được mã QR ghép khung',
   fin.body.qr?.compose?.startsWith('data:image/png'));
+check('KHÔNG còn mã QR xem ảnh gốc',
+  fin.body.qr?.view === undefined && fin.body.qr?.viewUrl === undefined);
 check('QR trỏ tới IP máy chủ, không phải localhost',
   fin.body.qr?.composeUrl?.includes('127.0.0.1:8199'), fin.body.qr?.composeUrl);
 check('QR KHÔNG chứa mã 4 số',
@@ -154,6 +155,26 @@ const savedCookie = cookie; cookie = '';
 check('không token thì KHÔNG tải được ảnh',
   (await api(`/media/previews/${pid}`)).status === 401);
 cookie = savedCookie;
+
+console.log('\n--- Khách tải ảnh từ album ---');
+const albumJpeg = await makeJpeg(900, 1200, { r: 30, g: 140, b: 90 });
+const up = await api(`/api/s/photos?t=${token}`, {
+  method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: albumJpeg,
+});
+// Phiên này đã chụp kín trần 4 ảnh — ảnh album có hạn mức riêng nên vẫn phải lọt
+check('khách tải được ảnh album lên phiên (dù đã chụp kín trần)',
+  up.status === 200 && !!up.body.photo?.id,
+  JSON.stringify(up.body));
+check('ảnh album thành ảnh của phiên',
+  (await api(`/api/s?t=${token}`)).body.photos?.length === 5);
+check('ảnh album có ảnh gốc để server dựng bản nét',
+  (await api(`/media/originals/${up.body.photo?.id}?t=${token}`)).status === 200);
+check('token sai thì không tải ảnh album lên được',
+  (await api('/api/s/photos?t=khong-hop-le', { method: 'POST', body: albumJpeg })).status === 404);
+check('file không phải ảnh bị từ chối',
+  (await api(`/api/s/photos?t=${token}`, {
+    method: 'POST', body: Buffer.from('khong phai anh'),
+  })).status === 400);
 
 console.log('\n--- Lưu ảnh ghép ---');
 const recipe = encodeURIComponent(JSON.stringify({ frameId: 'basic-4', slots: [] }));

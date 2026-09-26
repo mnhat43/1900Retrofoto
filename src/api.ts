@@ -30,10 +30,10 @@ export type CompositeInfo = {
   createdAt: number;
 };
 
-export type QrPair = {
-  viewUrl: string;
+/** Mã QR ghép khung của một phiên — mã duy nhất khách cần quét. */
+export type GuestQr = {
   composeUrl: string;
-  view: string;
+  /** Ảnh QR dạng data-URL. */
   compose: string;
 };
 
@@ -199,13 +199,13 @@ export const cancelSession = (id: string) =>
   req<{ ok: true }>(`/api/staff/sessions/${id}`, { method: 'DELETE' });
 
 /**
- * Lấy lại hai mã QR của một phiên để chìa cho khách quét.
+ * Lấy lại mã QR ghép khung của một phiên để chìa cho khách quét.
  *
  * Gọi theo yêu cầu chứ không kèm sẵn trong `staffRooms` — ảnh QR là data-URL
  * khá nặng so với nhịp đọc lại mỗi 4 giây của trang nhân viên.
  */
 export const staffSessionQr = (id: string) =>
-  req<{ code: string; status: string; qr: QrPair }>(`/api/staff/sessions/${id}/qr`);
+  req<{ code: string; status: string; qr: GuestQr }>(`/api/staff/sessions/${id}/qr`);
 
 export const staffSessionDetail = (id: string) =>
   req<{
@@ -262,7 +262,7 @@ export const roomSession = (room: string) =>
   req<{
     session: SessionInfo | null;
     photos?: PhotoInfo[];
-    qr?: QrPair | null;
+    qr?: GuestQr | null;
     locked?: boolean;
     /** Agent theo dõi thư mục có đang chạy cho phòng này không. */
     agent?: boolean;
@@ -300,7 +300,7 @@ export const capture = (room: string, file: File) =>
   );
 
 export const finishRoom = (room: string) =>
-  req<{ qr: QrPair }>(`/api/room/finish?room=${encodeURIComponent(room)}`, {
+  req<{ qr: GuestQr }>(`/api/room/finish?room=${encodeURIComponent(room)}`, {
     method: 'POST',
   });
 
@@ -393,46 +393,6 @@ export const updateFrame = (
 export const deleteFrame = (id: string) =>
   req<{ ok: true }>(`/api/staff/frames/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
-// ---- Bộ chỉnh màu ----
-
-export type ColorPreset = {
-  id: string;
-  label: string;
-  /** ColorState — mọi thanh -1..1 nên áp được cho mọi ảnh. */
-  params: Record<string, number | string>;
-  enabled: boolean;
-};
-
-/** Bộ đang bật, cho khách chọn. */
-export const listColorPresets = () =>
-  req<{ presets: ColorPreset[] }>('/api/color-presets');
-
-/** Đầy đủ, cho nhân viên. */
-export const staffColorPresets = () =>
-  req<{ presets: ColorPreset[] }>('/api/staff/color-presets');
-
-export const createColorPreset = (label: string, params: unknown) =>
-  req<{ preset: ColorPreset }>('/api/staff/color-presets', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ label, params }),
-  });
-
-export const updateColorPreset = (
-  id: string,
-  patch: { label?: string; params?: unknown; enabled?: boolean },
-) =>
-  req<{ preset: ColorPreset }>(`/api/staff/color-presets/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(patch),
-  });
-
-export const deleteColorPreset = (id: string) =>
-  req<{ ok: true }>(`/api/staff/color-presets/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  });
-
 // ---- Khách ----
 
 export const guestSession = (token: string) =>
@@ -446,6 +406,22 @@ export const photoUrl = (id: string, token: string) =>
 
 export const compositeUrl = (id: string, slug: string) =>
   `/media/strips/${id}?s=${encodeURIComponent(slug)}`;
+
+/**
+ * Khách tải một ảnh từ album điện thoại lên phiên của mình.
+ *
+ * Ảnh thành ảnh thật của phiên trên server — nhờ vậy bước dựng lại bản nét
+ * ở server vẫn tìm thấy ảnh gốc, y như ảnh máy chụp.
+ */
+export const uploadGuestPhoto = (token: string, blob: Blob) =>
+  req<{ photo: PhotoInfo; remaining: number }>(
+    `/api/s/photos?t=${encodeURIComponent(token)}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': blob.type || 'image/jpeg' },
+      body: blob,
+    },
+  );
 
 export async function saveComposite(
   token: string,

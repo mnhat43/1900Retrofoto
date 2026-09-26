@@ -156,7 +156,7 @@ for (const [label, dev, scheme] of [
   check(`chọn ảnh ${label}: nút Tiếp tục luôn nhìn thấy`,
     await p.isVisible('.actions .btn-primary'));
 
-  for (let i = 0; i < 6; i++) await p.click(`.photo >> nth=${i}`);
+  for (let i = 0; i < 6; i++) await p.click(`button.photo >> nth=${i}`);
   await p.click('.actions .btn-primary');
   await p.waitForSelector('.strip-canvas', { timeout: 20000 });
   await p.waitForTimeout(600);
