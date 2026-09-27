@@ -45,7 +45,16 @@ export type SlotContent = {
   zoom: number;
   /** Dịch chuyển, tính theo TỈ LỆ phần thừa. -1..1. 0 = căn giữa. */
   offset: { x: number; y: number };
+  /**
+   * Xoay theo chiều kim đồng hồ, độ. Tuỳ chọn: công thức ghép lưu trước khi
+   * có tính năng này không có trường này, và phải hiểu là 0.
+   */
+  rotate?: Rotation;
+  /** Lật ngang (soi gương), áp SAU khi xoay — tức lật theo đúng hướng khách thấy. */
+  flipX?: boolean;
 };
+
+export type Rotation = 0 | 90 | 180 | 270;
 
 /**
  * Ảnh đã nạp, sẵn sàng để vẽ.

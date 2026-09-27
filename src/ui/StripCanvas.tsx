@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { drawStrip, type StripState } from '../render/draw';
-import { slotRectPx } from '../core/placement';
+import { orientedSize, slotRectPx } from '../core/placement';
 import { panByPixels, zoomAt, hitSlot } from '../core/interaction';
 import { framePx } from '../core/format';
 import type { SlotContent } from '../core/types';
@@ -98,6 +98,28 @@ export function StripCanvas({
       ctx.clearRect(0, 0, w, h);
       drawStrip(ctx, latest.current.state, w, h, latest.current.overlay);
 
+      // Ô chưa có ảnh: nền xám nhạt + dấu "+" để khách biết chạm vào là thêm
+      // ảnh được. Chỉ ở preview — ảnh xuất ra không bao giờ đi qua đây.
+      const { frame, contents } = latest.current.state;
+      for (const slot of frame.slots) {
+        if (contents.has(slot.id)) continue;
+        const r = slotRectPx(slot.rect, w, h);
+        ctx.save();
+        ctx.fillStyle = 'rgba(120, 120, 140, 0.16)';
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        const s = Math.min(r.w, r.h) * 0.22;
+        ctx.strokeStyle = 'rgba(90, 90, 110, 0.55)';
+        ctx.lineWidth = Math.max(2, s * 0.12);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(r.x + r.w / 2 - s / 2, r.y + r.h / 2);
+        ctx.lineTo(r.x + r.w / 2 + s / 2, r.y + r.h / 2);
+        ctx.moveTo(r.x + r.w / 2, r.y + r.h / 2 - s / 2);
+        ctx.lineTo(r.x + r.w / 2, r.y + r.h / 2 + s / 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // Viền ô đang chọn — chỉ ở preview, không bao giờ vào file xuất.
       const active = latest.current.activeSlot;
       if (active) {
@@ -171,7 +193,7 @@ export function StripCanvas({
           const rect = slotRectPx(slot.rect, view.w, view.h);
           onChange(
             slotId,
-            zoomAt(content, photo.natural, rect, dist / pinch.current, mid),
+            zoomAt(content, orientedSize(photo.natural, content), rect, dist / pinch.current, mid),
           );
         }
       }
@@ -190,7 +212,10 @@ export function StripCanvas({
 
     const p = toPage(e);
     const rect = slotRectPx(slot.rect, view.w, view.h);
-    onChange(d.slot, panByPixels(content, photo.natural, rect, p.x - d.x, p.y - d.y));
+    onChange(
+      d.slot,
+      panByPixels(content, orientedSize(photo.natural, content), rect, p.x - d.x, p.y - d.y),
+    );
     drag.current = { ...d, x: p.x, y: p.y };
   };
 
@@ -215,7 +240,7 @@ export function StripCanvas({
 
     const rect = slotRectPx(slot.rect, view.w, view.h);
     const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
-    onChange(slotId, zoomAt(content, photo.natural, rect, factor, p));
+    onChange(slotId, zoomAt(content, orientedSize(photo.natural, content), rect, factor, p));
   };
 
   return (

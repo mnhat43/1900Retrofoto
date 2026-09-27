@@ -140,8 +140,49 @@ const results = await page.evaluate(async () => {
     });
   }
 
-  return out;
+  /*
+   * Xoay / lật: cùng bài kiểm với verify-api (phía server). Ảnh nửa trái đỏ,
+   * nửa phải xanh; hai phía PHẢI ra cùng kết quả, nếu không khách thấy một
+   * kiểu trên điện thoại mà tải về lại ra kiểu khác.
+   */
+  const f4 = FRAMES.find((f) => f.id === 'basic-4');
+  const tc = document.createElement('canvas');
+  tc.width = tc.height = 1000;
+  const tx = tc.getContext('2d');
+  tx.fillStyle = 'rgb(20,40,230)'; tx.fillRect(0, 0, 1000, 1000);
+  tx.fillStyle = 'rgb(230,20,20)'; tx.fillRect(0, 0, 500, 1000);
+  const tb = await createImageBitmap(tc);
+  const [s0, s1, s2] = f4.slots;
+  const rotState = {
+    frame: f4,
+    photos: new Map([['t', { id: 't', bitmap: tb, natural: { w: 1000, h: 1000 } }]]),
+    contents: new Map([
+      [s0.id, { ...DEFAULT_CONTENT('t'), rotate: 90 }],
+      [s1.id, { ...DEFAULT_CONTENT('t'), flipX: true }],
+      [s2.id, { ...DEFAULT_CONTENT('t'), rotate: 180 }],
+    ]),
+    color: DEFAULT_COLOR,
+  };
+  const rb = await createImageBitmap(await exportStrip(rotState, null, 'png'));
+  const rc = document.createElement('canvas');
+  rc.width = rb.width; rc.height = rb.height;
+  const rctx = rc.getContext('2d');
+  rctx.drawImage(rb, 0, 0);
+  const tone = (s, fx, fy) => {
+    const d = rctx.getImageData(
+      Math.round((s.rect.x + s.rect.w * fx) * rb.width),
+      Math.round((s.rect.y + s.rect.h * fy) * rb.height), 1, 1).data;
+    return d[0] > 150 && d[2] < 100 ? 'do' : d[2] > 150 && d[0] < 100 ? 'xanh' : `?(${d[0]},${d[2]})`;
+  };
+  const orient = {
+    rot90: [tone(s0, 0.5, 0.2), tone(s0, 0.5, 0.8)],
+    flip: [tone(s1, 0.2, 0.5), tone(s1, 0.8, 0.5)],
+    rot180: [tone(s2, 0.2, 0.5), tone(s2, 0.8, 0.5)],
+  };
+
+  return { out, orient };
 });
+const { out: frameResults, orient } = results;
 
 await browser.close();
 await server.close();
@@ -151,7 +192,11 @@ const fail = [];
 const near = (a, b, tol = 12) =>
   Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol;
 
-for (const r of results) {
+if (orient.rot90.join() !== 'do,xanh') fail.push(`xoay 90°: mong đợi trên đỏ/dưới xanh, được ${orient.rot90}`);
+if (orient.flip.join() !== 'xanh,do') fail.push(`lật ngang: mong đợi trái xanh/phải đỏ, được ${orient.flip}`);
+if (orient.rot180.join() !== 'xanh,do') fail.push(`xoay 180°: mong đợi trái xanh/phải đỏ, được ${orient.rot180}`);
+
+for (const r of frameResults) {
   const tag = `[${r.id}]`;
   if (r.size[0] !== r.expectedSize[0] || r.size[1] !== r.expectedSize[1]) {
     fail.push(`${tag} sai khổ: ${r.size} (mong đợi ${r.expectedSize})`);
@@ -171,7 +216,7 @@ if (errors.length) fail.push(`lỗi console: ${errors.join('; ')}`);
 
 console.log('khung          ô  khổ         kích thước    lệch preview/export');
 console.log('─'.repeat(66));
-for (const r of results) {
+for (const r of frameResults) {
   console.log(
     `${r.id.padEnd(14)} ${String(r.slotCount).padEnd(2)} ${r.formatId.padEnd(10)} ` +
       `${(r.size[0] + 'x' + r.size[1]).padEnd(12)} ${r.maxDiff}`,

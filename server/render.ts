@@ -36,8 +36,38 @@ export type Recipe = {
     photoId: string;
     zoom: number;
     offset: { x: number; y: number };
+    /** Thiếu = 0 (công thức lưu trước khi có xoay/lật). */
+    rotate?: number;
+    flipX?: boolean;
   }>;
 };
+
+/** Góc xoay hợp lệ. Recipe đến từ điện thoại khách nên không tin mù quáng. */
+const toRotation = (v: unknown): 0 | 90 | 180 | 270 =>
+  v === 90 || v === 180 || v === 270 ? v : 0;
+
+type Raw = { data: Buffer; info: sharp.OutputInfo };
+const fromRaw = (r: Raw) => sharp(r.data, {
+  raw: { width: r.info.width, height: r.info.height, channels: r.info.channels },
+});
+
+/**
+ * Ảnh gốc ĐÃ xoay + lật, dạng raw, để cắt ô như ảnh thường.
+ *
+ * Làm thành từng chặng tách rời (EXIF -> xoay -> lật) thay vì gọi nối trong
+ * một pipeline sharp: trong một pipeline, sharp tự quyết thứ tự rotate/flop/
+ * extract, và thứ tự đó phải khớp TUYỆT ĐỐI với drawOriented ở client (xoay
+ * trước, lật sau) — không thể để phụ thuộc vào chi tiết nội bộ của thư viện.
+ *
+ * Chỉ đi đường này khi thật sự có xoay/lật: raw của ảnh 24MP là ~72MB, ảnh
+ * không xoay vẫn đi đường cũ, nhẹ hơn.
+ */
+async function orientedRaw(original: Buffer, rotate: number, flipX: boolean): Promise<Raw> {
+  let r: Raw = await sharp(original).rotate().raw().toBuffer({ resolveWithObject: true });
+  if (rotate) r = await fromRaw(r).rotate(rotate).raw().toBuffer({ resolveWithObject: true });
+  if (flipX) r = await fromRaw(r).flop().raw().toBuffer({ resolveWithObject: true });
+  return r;
+}
 
 /*
  * Chỉnh màu dùng LẠI applyColor của app, không viết lại.
@@ -146,10 +176,18 @@ export async function renderFromOriginals(
       return null;                       // mất ảnh gốc -> không dựng lại được
     }
 
-    const meta = await sharp(original).rotate().metadata();
+    const rotate = toRotation(entry.rotate);
+    const flipX = entry.flipX === true;
+    const oriented = rotate || flipX ? await orientedRaw(original, rotate, flipX) : null;
+
+    const meta = oriented
+      ? { width: oriented.info.width, height: oriented.info.height }
+      : await sharp(original).rotate().metadata();
     if (!meta.width || !meta.height) return null;
 
     const rect = slotRectPx(slot.rect, page.w, page.h);
+    // Ảnh đã xoay sẵn nên kích thước đọc được CHÍNH LÀ kích thước sau xoay —
+    // đúng thứ client tính bằng orientedSize(). Không xoay thêm lần nữa.
     const place = resolveImagePlacement(
       { photoId: entry.photoId, zoom: entry.zoom, offset: entry.offset },
       { w: meta.width, h: meta.height },
@@ -171,14 +209,16 @@ export async function renderFromOriginals(
     const width = Math.max(1, Math.min(Math.round(sw), meta.width - left));
     const height = Math.max(1, Math.min(Math.round(sh), meta.height - top));
 
-    const piece = await sharp(original)
-      .rotate()
+    let cut = (oriented ? fromRaw(oriented) : sharp(original).rotate())
       .extract({ left, top, width, height })
       .resize(Math.max(1, Math.round(rect.w)), Math.max(1, Math.round(rect.h)), {
         fit: 'fill',
         kernel: 'lanczos3',            // thu nhỏ chất lượng cao
-      })
-      .toBuffer();
+      });
+    // Đầu vào raw thì sharp xuất ra raw, mà composite() không đọc được raw
+    // thiếu kích thước -> gói thành PNG không nén (nhanh, không mất chất lượng).
+    if (oriented) cut = cut.png({ compressionLevel: 0 });
+    const piece = await cut.toBuffer();
 
     layers.push({
       input: piece,

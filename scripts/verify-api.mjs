@@ -194,6 +194,66 @@ check('link chia sẻ mở được mà KHÔNG cần token',
 check('slug sai thì không mở được',
   (await api(`/media/strips/${cid}?s=khong-ton-tai`)).status === 404);
 
+console.log('\n--- Xoay / lật ảnh khi dựng bản nét ---');
+{
+  /*
+   * Ảnh nửa trái ĐỎ, nửa phải XANH. Biết trước kết quả từng phép:
+   *   xoay 90° (chiều kim đồng hồ): mép trái lên trên   -> trên đỏ, dưới xanh
+   *   lật ngang:                    trái <-> phải         -> trái xanh, phải đỏ
+   *   xoay 180°:                    cũng đảo trái/phải    -> trái xanh, phải đỏ
+   * Sai chiều xoay (ngược kim đồng hồ) sẽ ra trên xanh — chính lỗi cần bắt,
+   * vì canvas ở điện thoại và sharp ở server phải xoay cùng một chiều.
+   */
+  const sharp = (await import('sharp')).default;
+  const half = await sharp({ create: { width: 500, height: 1000, channels: 3, background: { r: 230, g: 20, b: 20 } } }).png().toBuffer();
+  const twoTone = await sharp({ create: { width: 1000, height: 1000, channels: 3, background: { r: 20, g: 40, b: 230 } } })
+    .composite([{ input: half, left: 0, top: 0 }]).jpeg({ quality: 95 }).toBuffer();
+  const up2 = await api(`/api/s/photos?t=${token}`, {
+    method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: twoTone,
+  });
+  check('tải ảnh hai màu để thử xoay', up2.status === 200, JSON.stringify(up2.body));
+  const pid2 = up2.body.photo.id;
+
+  const frames = (await api('/api/frames')).body.frames;
+  const f4 = frames.find((f) => f.id === 'basic-4');
+  const [s0, s1, s2] = f4.slots;
+  const recipeRot = encodeURIComponent(JSON.stringify({
+    frameId: 'basic-4',
+    slots: [
+      { slotId: s0.id, photoId: pid2, zoom: 1, offset: { x: 0, y: 0 }, rotate: 90 },
+      { slotId: s1.id, photoId: pid2, zoom: 1, offset: { x: 0, y: 0 }, flipX: true },
+      { slotId: s2.id, photoId: pid2, zoom: 1, offset: { x: 0, y: 0 }, rotate: 180 },
+    ],
+  }));
+  const rc = await api(
+    `/api/composites?t=${token}&frame=basic-4&w=600&h=1800&recipe=${recipeRot}`,
+    { method: 'POST', headers: { 'content-type': 'image/png' },
+      body: await makeJpeg(600, 1800, { r: 200, g: 200, b: 200 }) },
+  );
+  check('lưu được ảnh ghép có xoay/lật', rc.status === 200, JSON.stringify(rc.body));
+
+  const png = Buffer.from((await api(
+    `/media/strips/${rc.body.composite.id}?s=${rc.body.composite.slug}`)).body);
+  const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  // Màu tại một điểm (toạ độ chuẩn hoá trong ô) -> 'do' / 'xanh' / '?'
+  const at = (slot, fx, fy) => {
+    const x = Math.round((slot.rect.x + slot.rect.w * fx) * info.width);
+    const y = Math.round((slot.rect.y + slot.rect.h * fy) * info.height);
+    const i = (y * info.width + x) * info.channels;
+    const [r, , b] = [data[i], data[i + 1], data[i + 2]];
+    return r > 150 && b < 100 ? 'do' : b > 150 && r < 100 ? 'xanh' : `?(${r},${b})`;
+  };
+  check('xoay 90°: nửa trên đỏ, nửa dưới xanh (đúng chiều kim đồng hồ)',
+    at(s0, 0.5, 0.2) === 'do' && at(s0, 0.5, 0.8) === 'xanh',
+    `${at(s0, 0.5, 0.2)} / ${at(s0, 0.5, 0.8)}`);
+  check('lật ngang: trái xanh, phải đỏ',
+    at(s1, 0.2, 0.5) === 'xanh' && at(s1, 0.8, 0.5) === 'do',
+    `${at(s1, 0.2, 0.5)} / ${at(s1, 0.8, 0.5)}`);
+  check('xoay 180°: trái xanh, phải đỏ',
+    at(s2, 0.2, 0.5) === 'xanh' && at(s2, 0.8, 0.5) === 'do',
+    `${at(s2, 0.2, 0.5)} / ${at(s2, 0.8, 0.5)}`);
+}
+
 console.log('\n--- Chống dò mã ---');
 for (let i = 0; i < 6; i++) {
   await api('/api/room/claim', {

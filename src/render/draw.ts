@@ -1,4 +1,4 @@
-﻿import { resolveImagePlacement, slotRectPx } from '../core/placement';
+﻿import { orientedSize, resolveImagePlacement, slotRectPx } from '../core/placement';
 import type { Frame, Photo, SlotContent, ColorState } from '../core/types';
 import { applyColor, isIdentity } from './color';
 
@@ -40,11 +40,11 @@ export function drawStrip(
     if (!photo) continue;
 
     const rect = slotRectPx(slot.rect, pageW, pageH);
-    const place = resolveImagePlacement(content, photo.natural, rect);
+    const place = resolveImagePlacement(content, orientedSize(photo.natural, content), rect);
 
     ctx.save();
     clipSlot(ctx, rect, slot.radius, pageW, pageH);
-    ctx.drawImage(photo.bitmap, place.x, place.y, place.w, place.h);
+    drawOriented(ctx, photo.bitmap, place, content.rotate ?? 0, !!content.flipX);
     ctx.restore();
   }
 
@@ -61,6 +61,36 @@ export function drawStrip(
     ctx.drawImage(overlay, 0, 0, pageW, pageH);
   }
 
+  ctx.restore();
+}
+
+/**
+ * Vẽ bitmap vào khung `place` (khung của ảnh ĐÃ xoay), có xoay và lật.
+ *
+ * Thứ tự biến đổi: xoay trước, lật ngang sau — tức lật theo đúng hướng khách
+ * đang nhìn. server/render.ts làm y hệt thứ tự này (rotate rồi flop); đổi ở
+ * một bên mà quên bên kia thì ảnh tải về sẽ lật khác ảnh khách thấy.
+ */
+function drawOriented(
+  ctx: CanvasRenderingContext2D,
+  bitmap: CanvasImageSource,
+  place: { x: number; y: number; w: number; h: number },
+  rotate: number,
+  flipX: boolean,
+): void {
+  if (!rotate && !flipX) {
+    ctx.drawImage(bitmap, place.x, place.y, place.w, place.h);
+    return;
+  }
+  // Xoay 90/270 thì bitmap gốc nằm ngang so với khung: đổi chiều rộng/cao.
+  const quarter = rotate === 90 || rotate === 270;
+  const dw = quarter ? place.h : place.w;
+  const dh = quarter ? place.w : place.h;
+  ctx.save();
+  ctx.translate(place.x + place.w / 2, place.y + place.h / 2);
+  if (flipX) ctx.scale(-1, 1);
+  ctx.rotate((rotate * Math.PI) / 180);
+  ctx.drawImage(bitmap, -dw / 2, -dh / 2, dw, dh);
   ctx.restore();
 }
 

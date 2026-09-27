@@ -7,10 +7,12 @@ import {
 import { loadPhotosFromUrls, loadOverlay, prepareUpload } from '../../media/assets';
 import { framePx, type FormatId } from '../../core/format';
 import { DEFAULT_COLOR, DEFAULT_CONTENT } from '../../core/types';
-import type { Frame, Photo, SlotContent } from '../../core/types';
+import type { Frame, Photo, Rotation, SlotContent } from '../../core/types';
 import { exportStrip } from '../../render/export';
 import { resetContent } from '../../core/interaction';
-import { clampContent, slackOf, slotRectPx, MIN_ZOOM, MAX_ZOOM } from '../../core/placement';
+import {
+  clampContent, orientedSize, slackOf, slotRectPx, MIN_ZOOM, MAX_ZOOM,
+} from '../../core/placement';
 import { StripCanvas } from '../StripCanvas';
 import './studio.css';
 
@@ -72,6 +74,8 @@ export default function StudioApp() {
   const [result, setResult] = useState<{ composite: CompositeInfo; blob: Blob } | null>(null);
   /** Lời nhắn sau khi tải ảnh từ máy lên (ảnh hỏng, hết chỗ...). Không chặn luồng. */
   const [notice, setNotice] = useState('');
+  /** Ô đang mở bảng chọn ảnh (trong màn chỉnh). null = bảng đóng. */
+  const [picker, setPicker] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) { setError('Liên kết không hợp lệ'); setStep('error'); return; }
@@ -96,6 +100,7 @@ export default function StudioApp() {
   function pickFrame(f: Frame) {
     setFrame(f);
     setChosen([]);
+    setContents(new Map());
     setStep('pick');
   }
 
@@ -114,8 +119,8 @@ export default function StudioApp() {
    * Tuần tự từng ảnh: giải nén vài ảnh 12–48MP song song là cách nhanh nhất
    * làm Safari tự tải lại trang. Ảnh hỏng thì bỏ qua, gửi tiếp ảnh còn lại.
    */
-  async function addFromAlbum(files: File[]) {
-    if (!files.length) return;
+  async function addFromAlbum(files: File[]): Promise<string[]> {
+    if (!files.length) return [];
     setNotice('');
     const added: string[] = [];
     let failed = 0;
@@ -133,36 +138,63 @@ export default function StudioApp() {
       }
     }
     setBusy('');
-    // Điền sẵn ảnh vừa thêm vào các ô còn trống — khách tải lên là để dùng ngay.
+    setNotice(stop || (failed ? `${failed} ảnh không đọc được, hãy chọn ảnh khác` : ''));
+    return added;
+  }
+
+  /** Ở bước chọn ảnh: ảnh vừa tải lên tự được chọn, lấp các ô còn trống. */
+  async function addFromAlbumToPick(files: File[]) {
+    const added = await addFromAlbum(files);
     if (frame && added.length) {
       const n = frame.slotCount;
       setChosen((cur) => [...cur, ...added.filter((id) => !cur.includes(id))].slice(0, n));
     }
-    setNotice(stop || (failed ? `${failed} ảnh không đọc được, hãy chọn ảnh khác` : ''));
   }
 
-  /** Tải ảnh đã chọn về máy khách rồi vào editor. */
+  /**
+   * Tải bitmap cho những ảnh chưa có trên máy khách.
+   * Ném lỗi ra ngoài — nơi gọi quyết định báo thế nào.
+   */
+  async function ensureLoaded(ids: string[]) {
+    const need = [...new Set(ids)].filter((id) => !photos.has(id));
+    if (!need.length) return;
+    const loaded = await loadPhotosFromUrls(
+      need.map((id) => ({ url: photoUrl(id, token), id })),
+      (d, t) => setBusy(`Đang tải ảnh ${d}/${t}...`),
+    );
+    setPhotos((cur) => {
+      const next = new Map(cur);
+      for (const p of loaded) next.set(p.id, p);
+      return next;
+    });
+  }
+
+  /**
+   * Tải ảnh đã chọn về máy khách rồi vào editor.
+   *
+   * KHÔNG bắt chọn đủ số ô: khung 13 ô mà bắt chọn đủ 13 tấm ngay từ đầu thì
+   * khách bỏ cuộc. Chọn 1–2 tấm là vào ghép được, ô còn trống bù sau ngay
+   * trong màn chỉnh (chạm ô trống -> chọn ảnh).
+   */
   async function startEdit() {
-    if (!frame || chosen.length !== frame.slotCount) return;
+    if (!frame || chosen.length === 0) return;
     setBusy('Đang tải ảnh...');
     try {
-      const need = chosen.filter((id) => !photos.has(id));
-      if (need.length) {
-        const loaded = await loadPhotosFromUrls(
-          need.map((id) => ({ url: photoUrl(id, token), id })),
-          (d, t) => setBusy(`Đang tải ảnh ${d}/${t}...`),
-        );
-        setPhotos((cur) => {
-          const next = new Map(cur);
-          for (const p of loaded) next.set(p.id, p);
-          return next;
-        });
-      }
+      await ensureLoaded(chosen);
+      /*
+       * Ô nào vẫn giữ đúng ảnh cũ thì giữ luôn phần căn chỉnh — khách quay lại
+       * bước chọn ảnh để thêm ảnh thì không mất công căn/xoay các ô đã xong.
+       */
       const next = new Map<string, SlotContent>();
-      frame.slots.forEach((slot, i) => next.set(slot.id, DEFAULT_CONTENT(chosen[i])));
+      frame.slots.forEach((slot, i) => {
+        if (i >= chosen.length) return;
+        const prev = contents.get(slot.id);
+        next.set(slot.id, prev?.photoId === chosen[i] ? prev : DEFAULT_CONTENT(chosen[i]));
+      });
       setContents(next);
       // Chọn sẵn ô đầu tiên để bảng căn chỉnh không mở ra trong trạng thái trống.
       setActiveSlot(frame.slots[0].id);
+      setPicker(null);
       setTool('align');
       setSwapFrom(null);
       setStep('edit');
@@ -187,6 +219,7 @@ export default function StudioApp() {
         color: NO_COLOR,
         slots: [...contents.entries()].map(([slotId, c]) => ({
           slotId, photoId: c.photoId, zoom: c.zoom, offset: c.offset,
+          rotate: c.rotate ?? 0, flipX: !!c.flipX,
         })),
       };
       const r = await saveComposite(token, {
@@ -345,7 +378,6 @@ export default function StudioApp() {
   if (step === 'pick') {
     const need = frame?.slotCount ?? 0;
     const done = chosen.length === need;
-    const short = need - available.length;
 
     return (
       <div className="studio fixed">
@@ -361,9 +393,11 @@ export default function StudioApp() {
           <p className="lead">
             {done
               ? 'Đã đủ ảnh — bấm Tiếp tục'
-              : short > 0
-                ? `Cần thêm ${short} ảnh — bấm "Ảnh trong máy" để lấy từ album`
-                : `Chạm chọn ${need} ảnh theo thứ tự bạn muốn`}
+              : available.length === 0
+                ? 'Bấm "Ảnh trong máy" để lấy ảnh từ album'
+                : chosen.length === 0
+                  ? 'Chạm chọn ảnh theo thứ tự bạn muốn'
+                  : 'Chưa đủ cũng được — vào ghép rồi thêm ảnh sau'}
           </p>
           {notice && <p className="notice-inline">{notice}</p>}
 
@@ -386,7 +420,7 @@ export default function StudioApp() {
                   const files = [...(e.target.files ?? [])];
                   // Xoá chọn để lần sau chọn lại đúng ảnh ấy vẫn bắn onChange
                   e.target.value = '';
-                  addFromAlbum(files);
+                  addFromAlbumToPick(files);
                 }}
               />
               <span className="plus">+</span>
@@ -414,10 +448,10 @@ export default function StudioApp() {
         <div className="actions">
           <button
             className="btn btn-primary wide"
-            disabled={!done || !!busy}
+            disabled={chosen.length === 0 || !!busy}
             onClick={startEdit}
           >
-            {busy || (done ? 'Tiếp tục' : `Còn thiếu ${need - chosen.length} ảnh`)}
+            {busy || (chosen.length === 0 ? 'Chọn ít nhất 1 ảnh' : `Tiếp tục (${chosen.length}/${need})`)}
           </button>
         </div>
 
@@ -465,7 +499,7 @@ export default function StudioApp() {
     const slack = active && activePhoto
       ? slackOf(
           active,
-          activePhoto.natural,
+          orientedSize(activePhoto.natural, active),
           slotRectPx(frame.slots[slotIndex].rect, pagePx.w, pagePx.h),
         )
       : { w: 0, h: 0 };
@@ -491,12 +525,68 @@ export default function StudioApp() {
         setContents((cur) => {
           const a = cur.get(from);
           const b = cur.get(id);
-          if (!a || !b) return cur;
-          return new Map(cur).set(from, b).set(id, a);
+          if (!a && !b) return cur;
+          // Một bên trống = chuyển ảnh sang ô trống đó, không phải bỏ qua.
+          const next = new Map(cur);
+          if (b) next.set(from, b); else next.delete(from);
+          if (a) next.set(id, a); else next.delete(id);
+          return next;
         });
         setActiveSlot(id);
       }
       setSwapFrom(null);
+    };
+
+    const missing = frame.slots.filter((s) => !contents.has(s.id)).length;
+    const slotNo = (id: string) => frame.slots.findIndex((s) => s.id === id) + 1;
+
+    /** Chạm ô trên dải khi đang căn ảnh: ô trống thì mở luôn bảng chọn ảnh. */
+    const activate = (id: string | null) => {
+      setActiveSlot(id);
+      if (id && !contents.has(id)) setPicker(id);
+    };
+
+    /**
+     * Đặt ảnh vào các ô, bắt đầu từ `start`, rồi lấp tiếp các ô TRỐNG phía sau.
+     * Chọn một ảnh = thay ảnh ô đó; tải nhiều ảnh cùng lúc từ máy thì tấm
+     * đầu vào ô đang chọn, các tấm sau tự lấp ô trống — khỏi chọn từng ô.
+     */
+    const place = async (start: string, ids: string[]) => {
+      if (!ids.length) return;
+      setBusy('Đang tải ảnh...');
+      try {
+        await ensureLoaded(ids);
+        const empties = frame.slots
+          .map((s) => s.id)
+          .filter((id) => id !== start && !contents.has(id));
+        const targets = [start, ...empties];
+        setContents((cur) => {
+          const next = new Map(cur);
+          ids.slice(0, targets.length).forEach((pid, i) => next.set(targets[i], DEFAULT_CONTENT(pid)));
+          return next;
+        });
+        setActiveSlot(start);
+        setPicker(null);
+      } catch (e) {
+        setNotice(e instanceof Error ? e.message : 'Không tải được ảnh');
+      } finally {
+        setBusy('');
+      }
+    };
+
+    /*
+     * Xoay 90° mỗi lần bấm. Đưa ảnh về giữa: sau khi xoay, phần thừa đổi trục
+     * nên vị trí dịch cũ không còn nghĩa gì; giữ độ phóng vì đó là ý khách.
+     */
+    const rotate = () => {
+      if (!active) return;
+      const r = (((active.rotate ?? 0) + 90) % 360) as Rotation;
+      patch({ rotate: r, offset: { x: 0, y: 0 } });
+    };
+    const flip = () => {
+      if (!active) return;
+      // Lật gương thì phần dịch ngang cũng phải lật theo, ảnh mới đứng yên chỗ cũ.
+      patch({ flipX: !active.flipX, offset: { x: -active.offset.x, y: active.offset.y } });
     };
 
     return (
@@ -504,7 +594,16 @@ export default function StudioApp() {
       // luôn nhìn thấy, không bị canvas đẩy ra ngoài.
       <div className="studio fixed">
         <div className="bar">
-          <button className="back" onClick={() => setStep('pick')}>← Ảnh</button>
+          <button
+            className="back"
+            onClick={() => {
+              // Bước chọn ảnh phải thấy đúng những ảnh đang nằm trong khung
+              setChosen(frame.slots.flatMap((s) => contents.get(s.id)?.photoId ?? []));
+              setStep('pick');
+            }}
+          >
+            ← Ảnh
+          </button>
           <h1>{frame.label}</h1>
         </div>
 
@@ -515,7 +614,7 @@ export default function StudioApp() {
               state={stripState}
               overlay={overlay}
               activeSlot={swapping ? swapFrom : activeSlot}
-              onActivate={swapping ? pickSwap : setActiveSlot}
+              onActivate={swapping ? pickSwap : activate}
               onChange={(slotId, c) => setContents((cur) => new Map(cur).set(slotId, c))}
               onCommit={() => {}}
               selectOnly={swapping}
@@ -583,13 +682,31 @@ export default function StudioApp() {
                   {frame.slots.map((s, i) => (
                     <button
                       key={s.id}
-                      className={s.id === slotId ? 'chip on' : 'chip'}
-                      onClick={() => setActiveSlot(s.id)}
+                      className={[
+                        'chip',
+                        s.id === slotId ? 'on' : '',
+                        contents.has(s.id) ? '' : 'empty',
+                      ].join(' ').trim()}
+                      onClick={() => activate(s.id)}
                     >
-                      Ô{i + 1}
+                      Ô{i + 1}{contents.has(s.id) ? '' : ' +'}
                     </button>
                   ))}
                 </div>
+
+                {active && (
+                  <div className="slot-actions">
+                    <button onClick={() => setPicker(slotId)}>Đổi ảnh</button>
+                    <button onClick={rotate} aria-label="Xoay 90 độ">⟳ Xoay</button>
+                    <button
+                      className={active.flipX ? 'on' : ''}
+                      onClick={flip}
+                      aria-label="Lật ngang"
+                    >
+                      ⇋ Lật
+                    </button>
+                  </div>
+                )}
 
                 {active ? (
                   <div className="align">
@@ -627,9 +744,9 @@ export default function StudioApp() {
                     </div>
                   </div>
                 ) : (
-                  <div className="slot-note">
-                    <span>Ô {slotIndex + 1} chưa có ảnh</span>
-                  </div>
+                  <button className="slot-fill" onClick={() => setPicker(slotId)}>
+                    + Chọn ảnh cho Ô{slotIndex + 1}
+                  </button>
                 )}
 
                 {active && (!canX || !canY) && (
@@ -643,10 +760,62 @@ export default function StudioApp() {
         </div>
 
         <div className="actions">
-          <button className="btn btn-primary wide" disabled={!!busy} onClick={onSave}>
-            {busy || 'Hoàn thiện & Lưu'}
+          <button className="btn btn-primary wide" disabled={!!busy || missing > 0} onClick={onSave}>
+            {busy || (missing > 0 ? `Còn ${missing} ô trống` : 'Hoàn thiện & Lưu')}
           </button>
         </div>
+
+        {/*
+          Bảng chọn ảnh cho một ô — thay ảnh hoặc lấp ô trống ngay tại chỗ,
+          không phải thoát ra bước chọn ảnh rồi làm lại từ đầu.
+        */}
+        {picker && (
+          <div className="sheet-backdrop" onClick={() => setPicker(null)}>
+            <div className="sheet" onClick={(e) => e.stopPropagation()}>
+              <div className="sheet-head">
+                <b>Chọn ảnh cho Ô{slotNo(picker)}</b>
+                <button className="back" onClick={() => setPicker(null)}>Đóng</button>
+              </div>
+              {notice && <p className="notice-inline">{notice}</p>}
+              <div className="scroll-area">
+                <div className="photo-grid">
+                  <label className={busy ? 'photo add off' : 'photo add'}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      hidden
+                      disabled={!!busy}
+                      onChange={(e) => {
+                        const files = [...(e.target.files ?? [])];
+                        e.target.value = '';
+                        const slot = picker;
+                        addFromAlbum(files).then((ids) => place(slot, ids));
+                      }}
+                    />
+                    <span className="plus">+</span>
+                    <span className="add-label">Ảnh trong máy</span>
+                  </label>
+                  {available.map((p) => {
+                    // Ảnh đang nằm ở ô nào — để khách khỏi chọn trùng mà không biết
+                    const at = frame.slots.findIndex((s) => contents.get(s.id)?.photoId === p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        className={at >= 0 ? 'photo used' : 'photo'}
+                        onClick={() => place(picker, [p.id])}
+                        aria-label={`Ảnh ${p.seq}${at >= 0 ? `, đang ở ô ${at + 1}` : ''}`}
+                      >
+                        <img src={photoUrl(p.id, token)} alt="" loading="lazy" />
+                        {at >= 0 && <span className="num">Ô{at + 1}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {busy && (
           <div className="overlay">

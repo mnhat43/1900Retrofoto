@@ -797,6 +797,101 @@ body {
   color: var(--text-2);
 }
 
+/* ---------- Thao tác từng ô: đổi ảnh / xoay / lật ---------- */
+
+.slot-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.slot-actions button {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.slot-actions button:active { transform: scale(.97); }
+.slot-actions button.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+/* Chip của ô chưa có ảnh: nét đứt, như ô "+" trên dải */
+.chip.empty { border-style: dashed; }
+
+/* Ô đang chọn còn trống: một nút to, rõ việc cần làm */
+.slot-fill {
+  min-height: 48px;
+  border: 2px dashed var(--accent);
+  border-radius: var(--r);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* ---------- Bảng chọn ảnh cho một ô (trượt từ dưới lên) ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 15;                       /* dưới .overlay (đang tải) để vẫn thấy tiến độ */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, .35);
+}
+
+.sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 82vh;
+  max-height: 82dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, .18);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sheet-head b { font-size: 16px; }
+
+.sheet-head .back {
+  min-height: var(--tap);
+  padding: 0 4px 0 12px;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/*
+ * Bảng chỉ có max-height, không có chiều cao cố định — .scroll-area gốc
+ * (flex-basis 0) sẽ co về 0 và lưới ảnh biến mất. Ở đây cho nó cao theo
+ * nội dung, chạm trần max-height của bảng thì mới cuộn.
+ */
+.sheet .scroll-area { flex: 1 1 auto; }
+
+/* Ảnh đã nằm ở ô khác: làm mờ nhẹ, kèm nhãn ô */
+.photo.used img { opacity: .55; }
+
 .overlay {
   position: fixed;
   inset: 0;

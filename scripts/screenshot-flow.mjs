@@ -120,7 +120,24 @@ await phone.waitForSelector('.result');
 await phone.waitForTimeout(500);
 await shot(phone, 'flow-9-phone-saved');
 
-console.log('da chup 9 man hinh vao scratch/');
+// Ghép dần: chọn 2 ảnh cho khung 4 ô, ô trống bù sau
+await phone.goto(composeUrl);
+await phone.waitForSelector('.frame-grid');
+await phone.click('.frame-item:has-text("Basic 4")');
+await phone.waitForSelector('.photo-grid');
+await phone.click('button.photo >> nth=0');
+await phone.click('button.photo >> nth=1');
+await phone.click('.actions .btn-primary');
+await phone.waitForSelector('.strip-canvas');
+await phone.click('.slot-actions button:has-text("Xoay")');
+await phone.waitForTimeout(600);
+await shot(phone, 'flow-10-phone-partial');
+await phone.click('.chip.empty >> nth=0');
+await phone.waitForSelector('.sheet');
+await phone.waitForTimeout(400);
+await shot(phone, 'flow-11-phone-sheet');
+
+console.log('da chup 11 man hinh vao scratch/');
 
 await browser.close();
 server.close();

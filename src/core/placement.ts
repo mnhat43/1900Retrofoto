@@ -8,6 +8,18 @@ export function coverScale(img: Size, slot: Size): number {
   return Math.max(slot.w / img.w, slot.h / img.h);
 }
 
+/**
+ * Kích thước ảnh SAU khi xoay — thứ khách thật sự nhìn thấy trong ô.
+ *
+ * Mọi phép tính phủ ô / phần thừa / kéo / phóng đều phải dùng kích thước
+ * này chứ không phải kích thước gốc: xoay 90° thì ảnh ngang thành ảnh dọc,
+ * tính theo kích thước gốc sẽ hở nền hoặc cắt sai chỗ.
+ */
+export function orientedSize(img: Size, content: Pick<SlotContent, 'rotate'>): Size {
+  const r = content.rotate ?? 0;
+  return r === 90 || r === 270 ? { w: img.h, h: img.w } : img;
+}
+
 /** Đổi toạ độ chuẩn hoá 0..1 sang pixel ở một kích thước dải cụ thể. */
 export function slotRectPx(rect: NormRect, stripW: number, stripH: number): Rect {
   return {
@@ -20,6 +32,9 @@ export function slotRectPx(rect: NormRect, stripW: number, stripH: number): Rect
 
 /**
  * Tính vị trí vẽ ảnh trong ô, cùng hệ pixel với `slotRect`.
+ *
+ * `img` là kích thước ĐÃ XOAY (orientedSize); kết quả là khung chữ nhật của
+ * ảnh đã xoay. Nơi vẽ tự xoay bitmap vào đúng khung này.
  *
  * BẤT BIẾN THEO SCALE — đây là tính chất cốt lõi của toàn app:
  * nhân `slotRect` với hệ số k bất kỳ thì kết quả cũng nhân đúng k.

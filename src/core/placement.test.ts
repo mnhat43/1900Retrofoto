@@ -4,6 +4,7 @@ import {
   resolveImagePlacement,
   clampContent,
   slotRectPx,
+  orientedSize,
   MIN_ZOOM,
 } from './placement';
 import type { SlotContent } from './types';
@@ -124,5 +125,25 @@ describe('slotRectPx', () => {
       w: 150,
       h: 900,
     });
+  });
+});
+
+describe('orientedSize', () => {
+  it('không xoay hoặc xoay 180 thì giữ nguyên kích thước', () => {
+    expect(orientedSize({ w: 300, h: 200 }, {})).toEqual({ w: 300, h: 200 });
+    expect(orientedSize({ w: 300, h: 200 }, { rotate: 180 })).toEqual({ w: 300, h: 200 });
+  });
+
+  it('xoay 90/270 thì ảnh ngang thành ảnh dọc', () => {
+    expect(orientedSize({ w: 300, h: 200 }, { rotate: 90 })).toEqual({ w: 200, h: 300 });
+    expect(orientedSize({ w: 300, h: 200 }, { rotate: 270 })).toEqual({ w: 200, h: 300 });
+  });
+
+  it('ảnh ngang xoay 90 vào ô dọc vẫn phủ kín, không hở nền', () => {
+    const slot = { x: 0, y: 0, w: 100, h: 300 };
+    const img = orientedSize({ w: 600, h: 200 }, { rotate: 90 });   // -> 200x600
+    const p = resolveImagePlacement(content({ rotate: 90 }), img, slot);
+    expect(p.w).toBeGreaterThanOrEqual(slot.w - 1e-9);
+    expect(p.h).toBeGreaterThanOrEqual(slot.h - 1e-9);
   });
 });

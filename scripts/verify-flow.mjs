@@ -137,11 +137,14 @@ check('hiện cả khung nhiều ô hơn số ảnh đang có',
 await phone.click('.frame-item:has-text("Basic 4")');
 await phone.waitForSelector('.photo-grid', { timeout: 10000 });
 
-// Chọn thiếu ảnh -> nút Tiếp tục phải bị khoá
+// Chưa chọn ảnh nào -> chưa cho đi tiếp; chọn 1–2 tấm là đi tiếp được
+// (khung nhiều ô không bắt chọn đủ một lượt, ô trống bù sau trong màn chỉnh)
+check('chưa chọn ảnh nào thì chưa cho đi tiếp',
+  await phone.isDisabled('.actions .btn-primary'));
 await phone.click('button.photo >> nth=0');
 await phone.click('button.photo >> nth=1');
-check('chọn thiếu ảnh thì chưa cho đi tiếp',
-  await phone.isDisabled('.actions .btn-primary'));
+check('chọn thiếu ảnh vẫn cho đi tiếp',
+  !(await phone.isDisabled('.actions .btn-primary')));
 
 await phone.click('button.photo >> nth=2');
 await phone.click('button.photo >> nth=3');
@@ -244,8 +247,8 @@ await phone.click('.frame-item:has-text("Basic 6")');
 await phone.waitForSelector('.photo-grid', { timeout: 10000 });
 check('có ô "Ảnh trong máy" ở đầu lưới',
   await phone.isVisible('.photo-grid > .photo.add:first-child'));
-check('nhắc khách còn thiếu ảnh',
-  (await phone.textContent('.lead'))?.includes('Cần thêm 2 ảnh'));
+check('nhắc khách chọn ảnh',
+  (await phone.textContent('.lead'))?.includes('Chạm chọn ảnh'));
 
 const albumFile = async (name, r) => ({
   name, mimeType: 'image/jpeg',
@@ -279,6 +282,68 @@ const strip2 = readdirSync(join(albumDir, 'strips')).sort().at(-1);
 // nhưng vẫn phải nét hơn bản 300 DPI điện thoại tự ghép.
 const albumDpi = (await sharp(join(albumDir, 'strips', strip2)).metadata()).density;
 check('dải có ảnh album vẫn được server dựng bản nét', albumDpi > 300, String(albumDpi));
+
+// ---------------------------------------------------------------------------
+console.log('\n--- Ghép dần: chọn ít ảnh, bù ô trống, thay ảnh, xoay/lật ---');
+await phone.goto(composeUrl);
+await phone.waitForSelector('.frame-grid', { timeout: 15000 });
+await phone.click('.frame-item:has-text("Basic 4")');
+await phone.waitForSelector('.photo-grid', { timeout: 10000 });
+await phone.click('button.photo >> nth=0');
+await phone.click('.actions .btn-primary');
+await phone.waitForSelector('.strip-canvas', { timeout: 20000 });
+check('chọn 1 ảnh vẫn vào được màn ghép', true);
+
+const saveBtn = phone.locator('.actions .btn-primary');
+check('còn ô trống thì chưa cho lưu', await saveBtn.isDisabled());
+check('nút lưu nói rõ còn mấy ô trống',
+  (await saveBtn.textContent())?.includes('Còn 3 ô trống'), await saveBtn.textContent());
+
+// Chạm chip ô trống -> mở bảng chọn ảnh -> chọn -> ô được lấp
+await phone.click('.chip.empty >> nth=0');
+await phone.waitForSelector('.sheet', { timeout: 5000 });
+check('chạm ô trống thì mở bảng chọn ảnh', await phone.isVisible('.sheet'));
+check('bảng chọn ảnh có nút lấy ảnh trong máy', await phone.isVisible('.sheet .photo.add'));
+await phone.click('.sheet button.photo >> nth=1');
+await phone.waitForSelector('.sheet', { state: 'detached', timeout: 10000 });
+check('chọn xong thì ô được lấp, còn 2 ô trống',
+  (await saveBtn.textContent())?.includes('Còn 2 ô trống'), await saveBtn.textContent());
+
+// Ô đầu: thay ảnh khác ngay tại chỗ, không phải quay lại từ đầu
+await phone.click('.presets .chip >> nth=0');
+const firstSrc = () => phone.locator('.swap-item img').nth(0).getAttribute('src');
+await phone.click('.tool-tabs button:has-text("Đổi chỗ")');
+const beforeSwapSrc = await firstSrc();
+await phone.click('.tool-tabs button:has-text("Căn ảnh")');
+await phone.click('.presets .chip >> nth=0');
+await phone.click('.slot-actions button:has-text("Đổi ảnh")');
+await phone.waitForSelector('.sheet', { timeout: 5000 });
+check('ảnh đang dùng được đánh dấu ô trong bảng chọn',
+  (await phone.locator('.sheet .photo.used').count()) >= 2);
+await phone.click('.sheet button.photo >> nth=2');
+await phone.waitForSelector('.sheet', { state: 'detached', timeout: 10000 });
+await phone.click('.tool-tabs button:has-text("Đổi chỗ")');
+check('đổi ảnh ô 1 thành ảnh khác', (await firstSrc()) !== beforeSwapSrc);
+await phone.click('.tool-tabs button:has-text("Căn ảnh")');
+
+// Xoay / lật
+await phone.click('.presets .chip >> nth=0');
+await phone.click('.slot-actions button:has-text("Xoay")');
+await phone.click('.slot-actions button:has-text("Lật")');
+check('nút Lật sáng lên khi đang lật',
+  await phone.locator('.slot-actions button.on:has-text("Lật")').isVisible());
+
+// Lấp nốt 2 ô còn lại
+for (let k = 0; k < 2; k++) {
+  await phone.click('.chip.empty >> nth=0');
+  await phone.waitForSelector('.sheet', { timeout: 5000 });
+  await phone.click(`.sheet button.photo >> nth=${k}`);
+  await phone.waitForSelector('.sheet', { state: 'detached', timeout: 10000 });
+}
+check('đủ ô thì cho lưu', !(await saveBtn.isDisabled()));
+await saveBtn.click();
+await phone.waitForSelector('.result', { timeout: 30000 });
+check('lưu được dải ghép dần có xoay/lật', await phone.isVisible('.result'));
 
 if (errors.length) fails.push(`lỗi trang: ${errors.join('; ')}`);
 
