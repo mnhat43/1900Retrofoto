@@ -68,7 +68,7 @@ Windows có thể hỏi *"Do you want to allow this app to make changes?"* → b
 
 ### Bước 2: Điền thông tin
 
-Một cửa sổ hồng hiện ra với 4 ô:
+Một cửa sổ hồng hiện ra với 3 ô:
 
 ```
 ┌──────────────────────────────────────────┐
@@ -77,7 +77,6 @@ Một cửa sổ hồng hiện ra với 4 ô:
 │                                          │
 │  Mat khau nhan vien  [____________]      │
 │  Thu muc luu anh     [D:\photobooth]     │
-│  Thu muc may anh     [D:\Anh]            │
 │  Cong                [8090]              │
 │                                          │
 │            [   Cai dat   ]               │
@@ -90,7 +89,6 @@ Một cửa sổ hồng hiện ra với 4 ô:
 |---|---|
 | **Mật khẩu nhân viên** | Tự đặt, **ít nhất 4 ký tự**. Nhân viên dùng để đăng nhập. Ghi lại chỗ nào đó |
 | **Thư mục lưu ảnh** | Sửa chữ `D` thành ổ bạn đã chọn ở Phần A. Ví dụ `E:\photobooth` |
-| **Thư mục máy ảnh** | Sửa giống ổ trên. Ví dụ `E:\Anh` |
 | **Cổng** | Để nguyên `8090` |
 
 ### Bước 3: Bấm "Cai dat"
@@ -182,18 +180,17 @@ Làm cho **từng phòng**. Ví dụ dưới đây là phòng 1.
 
 ---
 
-## Phần F — Nối phần mềm máy ảnh
+## Phần F — Ảnh của khách
 
-Hệ thống lấy ảnh bằng cách **đọc thư mục**, không cần cắm dây gì thêm.
+Hệ thống **không lấy ảnh từ máy ảnh** — không cần nối phần mềm máy ảnh hay
+chỉnh thư mục nào.
 
 **Cách hoạt động:**
 
-1. Bạn tạo mã cho khách, ví dụ mã `8206`
-2. Hệ thống tự tạo thư mục `E:\Anh\8206\`
-3. Bạn chỉnh phần mềm máy ảnh (EOS Utility, digiCamControl…) lưu ảnh vào đó
-4. Khách bấm **"Đã chụp xong"** → hệ thống tự nạp ảnh
-
-> Nếu chưa quen, cứ chép ảnh vào thư mục đó bằng tay cũng chạy được.
+1. Khách chụp xong, bấm **"Đã chụp xong"** ở phòng → hiện mã QR
+2. Quán gửi file ảnh cho khách (AirDrop, Zalo, …)
+3. Khách quét QR → chọn khung → bấm **"Tải ảnh lên"** để chọn ảnh vừa nhận
+4. Khách ghép xong thì bấm **Tải xuống**
 
 ---
 
@@ -205,10 +202,10 @@ Tự đóng vai khách một lần cho chắc:
 2. Chọn **Phòng 1** → chọn số kiểu ảnh → bấm **Tạo mã**
 3. Ghi lại 4 số hiện ra
 4. Sang máy phòng 1, nhập 4 số đó
-5. Chép vài tấm ảnh bất kỳ vào thư mục `E:\Anh\<4 số>\`
-6. Bấm **"Đã chụp xong"** → hiện 2 mã QR
-7. Lấy điện thoại (**phải nối WiFi quán**, không dùng 4G) quét QR bên phải
-8. Chọn khung → chọn ảnh → bấm **Hoàn thiện & Lưu**
+5. Bấm **"Đã chụp xong"** → hiện mã QR
+6. Lấy điện thoại (**phải nối WiFi quán**, không dùng 4G) quét mã QR
+7. Chọn khung → bấm **Tải ảnh lên**, chọn vài tấm ảnh bất kỳ trong máy
+8. Ghép xong bấm **Hoàn thiện & Lưu**
 9. Bấm **Tải xuống**
 
 Ảnh về được máy điện thoại là hệ thống sẵn sàng.
@@ -405,10 +402,11 @@ Nhấp đúp lối tắt **`KHOI-DONG-LAI`** ngoài màn hình. Chờ khoảng 2
 Muốn xem cửa sổ chạy để đọc lỗi thì nhấp đúp `Chay-server.cmd` trong thư mục
 `C:\1900Retrofoto`. Cửa sổ đen hiện ra thì **để nguyên đó**, tắt là dừng.
 
-### Bấm "Đã chụp xong" mà không thấy ảnh
+### Khách không tải được ảnh lên
 
-Ảnh chưa nằm đúng chỗ. Mở File Explorer, vào `E:\Anh\` — phải có thư mục
-tên **đúng bằng 4 số** của mã, và ảnh nằm ngay trong đó.
+- Báo **"Phiên đã đủ số ảnh tối đa"**: vào trang quản lý, dòng *"Khách tải
+  lên tối đa … ảnh mỗi phiên"* → bấm **Đổi** để tăng. Chỉ áp cho mã tạo sau.
+- Báo **"Ảnh này không đọc được"**: file hỏng — gửi lại cho khách file khác.
 
 ### Quên mật khẩu nhân viên
 

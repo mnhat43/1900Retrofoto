@@ -30,32 +30,15 @@ import {
   deleteFrame, seedBuiltins,
 } from './frames.ts';
 import type { DetectedSlot } from './detect.ts';
-import { handleTrigger, shotFloor, listenTriggerPorts } from './trigger.ts';
+import { handleTrigger, listenTriggerPorts } from './trigger.ts';
 import { renderFromOriginals, type Recipe } from './render.ts';
 import { listPresets, createPreset, updatePreset, deletePreset } from './presets.ts';
 import { listPrices, createPrice, updatePrice, deletePrice, getPrice } from './prices.ts';
 import { runCleanup, cleanupTiers, purgeOlderThan, CLEANUP_TIERS } from './cleanup.ts';
-import { intakeFromFolder, ensureCaptureDir, captureEnabled, captureDir } from './intake.ts';
 import { diskInfo } from './disk.ts';
 import { logLine, logError, recentLog } from './log.ts';
 
 const DIST = resolve(process.cwd(), 'dist');
-
-/**
- * Theo dõi agent còn sống hay không, theo từng phòng.
- * Chỉ giữ trong bộ nhớ — mất khi khởi động lại server là đúng, vì lúc đó
- * agent cũng sẽ ping lại ngay.
- */
-const agentPing = new Map<string, number>();
-const AGENT_TIMEOUT = 45_000;   // quá 45s không ping -> coi như đã tắt
-
-function agentSeen(rooms: string[]): void {
-  const t = Date.now();
-  for (const r of rooms) agentPing.set(r, t);
-}
-
-const agentAlive = (room: string) =>
-  Date.now() - (agentPing.get(room) ?? 0) < AGENT_TIMEOUT;
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -102,17 +85,6 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
 
   if (path === '/api/staff/me') {
     json(res, 200, { staff: isStaff(req), rooms: CONFIG.rooms });
-    return true;
-  }
-
-  /**
-   * Agent báo còn sống. Nhờ vậy màn hình phòng biết ảnh sẽ tự về hay
-   * phải thêm tay — thay vì để nhân viên đoán.
-   */
-  if (path === '/api/agent/ping' && method === 'POST') {
-    const rooms = url.searchParams.get('rooms') ?? '';
-    agentSeen(rooms.split(',').filter(Boolean));
-    json(res, 200, { ok: true });
     return true;
   }
 
@@ -248,12 +220,11 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
       maxPhotos?: number; note?: string; room?: string; priceId?: string;
     }>(req);
     /*
-     * Trần ảnh lấy từ THIẾT LẬP, không phải nhân viên chọn từng phiên —
-     * quán không bán gói theo số kiểu nữa, ảnh chụp được bao nhiêu tính bấy
-     * nhiêu, trần chỉ còn là lưới an toàn.
+     * Trần số ảnh khách được tải lên lấy từ THIẾT LẬP, không phải nhân viên
+     * chọn từng phiên — chỉ là lưới an toàn cho ổ đĩa.
      *
      * Vẫn nhận `maxPhotos` nếu người gọi ghi rõ: các script kiểm chứng cần
-     * đặt trần thấp để thử đúng nhánh "chụp đầy". Giao diện thì không gửi.
+     * đặt trần thấp để thử đúng nhánh "đã đầy". Giao diện thì không gửi.
      */
     const maxPhotos = body.maxPhotos == null
       ? maxPhotosPerSession()
@@ -295,11 +266,7 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
       priceAmount: chosen?.amount ?? null,
       priceLabel: chosen?.label ?? null,
     });
-    // Tao san thu muc chup de nhan vien tro phan mem Canon vao ngay
-    const dir = ensureCaptureDir(s.code);
-    json(res, 200, {
-      id: s.id, code: s.code, maxPhotos: s.max_photos, room: roomId, captureDir: dir,
-    });
+    json(res, 200, { id: s.id, code: s.code, maxPhotos: s.max_photos, room: roomId });
     return true;
   }
 
@@ -631,21 +598,12 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
      */
     const s = roomDisplaySession(room);
     if (!s) {
-      json(res, 200, {
-        session: null,
-        locked: isLockedOut(room),
-        agent: agentAlive(room),
-        captureEnabled: captureEnabled(),
-      });
+      json(res, 200, { session: null, locked: isLockedOut(room) });
       return true;
     }
     const done = s.status === 'done' || s.status === 'composed';
     json(res, 200, {
       session: publicSession(s),
-      photos: listPhotos(s.id).map(publicPhoto),
-      agent: agentAlive(room),
-      captureEnabled: captureEnabled(),
-      captureDir: captureEnabled() ? captureDir(s.code) : null,
       qr: done ? await makeQr(ctx, s.access_token) : null,
       /* Buồng đã sẵn sàng nhận khách mới — màn hình phòng nói rõ cho nhân viên */
       roomFree: done,
@@ -699,76 +657,12 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
   }
 
   /**
-   * Nhận ảnh. HỢP ĐỒNG dùng chung cho upload thủ công (giai đoạn này) và
-   * app PC điều khiển Canon (sau này) — chỉ khác tham số `source`.
-   */
-  if (path === '/api/capture' && method === 'POST') {
-    const room = url.searchParams.get('room') ?? '';
-    const s = activeForRoom(room);
-    if (!s) { json(res, 409, { error: 'Phòng chưa mở khoá' }); return true; }
-
-    /*
-     * Ảnh chụp TRƯỚC khi LumaBooth mở lượt này là của khách trước về trễ.
-     * Chỉ lọc khi có trigger (shotFloor khác null) — không có trigger thì
-     * giữ nguyên hành vi cũ, agent vẫn chạy được một mình.
-     */
-    const floor = shotFloor(room);
-    const mtime = Number(url.searchParams.get('mtime') ?? 0);
-    if (floor !== null && mtime > 0 && mtime < floor) {
-      logLine(`phòng ${room}: bỏ ảnh cũ hơn lượt chụp hiện tại`);
-      json(res, 409, { error: 'Ảnh thuộc lượt chụp trước', reason: 'stale' });
-      return true;
-    }
-
-    try {
-      const data = await readBody(req);
-      const source = url.searchParams.get('source') === 'agent' ? 'agent' : 'manual';
-      /*
-       * Tên file gốc là thứ chống gửi trùng: intakeFromFolder và agent đều
-       * nhận diện ảnh đã nạp theo tên này. Bỏ quên nó thì cùng một ảnh gửi
-       * lại vẫn lọt, và khách thấy mỗi kiểu lặp mấy lần.
-       */
-      const name = url.searchParams.get('name') ?? undefined;
-      const r = await addPhoto(s, data, source, name);
-      json(res, 200, { photo: publicPhoto(r.photo), count: r.count, remaining: r.remaining });
-    } catch (err) {
-      if (err instanceof CaptureError) {
-        const conflict = err.code === 'full' || err.code === 'duplicate';
-        json(res, conflict ? 409 : 400, { error: err.message, reason: err.code });
-      } else {
-        json(res, 400, { error: String((err as Error).message) });
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Khách bấm "Đã chụp xong" — quét thư mục của phiên và nạp ảnh.
+   * Khách chụp xong -> hiện QR ghép khung.
    *
-   * Gọi lại được nhiều lần (nút "Quét lại") mà không nhân đôi ảnh, vì
-   * intakeFromFolder bỏ qua file đã nạp.
+   * Hệ thống KHÔNG nạp ảnh máy chụp nữa: quán tự đưa file ảnh cho khách,
+   * khách tải lên ở trang ghép khung. Nên bấm lúc nào cũng được, không cần
+   * phiên đã có ảnh.
    */
-  if (path === '/api/room/intake' && method === 'POST') {
-    const room = url.searchParams.get('room') ?? '';
-    const s = activeForRoom(room);
-    if (!s) { json(res, 409, { error: 'Phòng chưa mở khoá' }); return true; }
-    if (!captureEnabled()) {
-      json(res, 400, {
-        error: 'Chưa cấu hình thư mục chụp (PHOTOBOOTH_CAPTURE)',
-        reason: 'not_configured',
-      });
-      return true;
-    }
-
-    try {
-      const r = await intakeFromFolder(s);
-      json(res, 200, r);
-    } catch (err) {
-      json(res, 500, { error: (err as Error).message });
-    }
-    return true;
-  }
-
   if (path === '/api/room/finish' && method === 'POST') {
     const room = url.searchParams.get('room') ?? '';
     const s = activeForRoom(room);
@@ -784,14 +678,20 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     if (!s) { json(res, 404, { error: 'Liên kết không hợp lệ hoặc đã hết hạn' }); return true; }
     json(res, 200, {
       session: publicSession(s),
-      photos: listPhotos(s.id).map(publicPhoto),
+      /*
+       * Chỉ ảnh KHÁCH tự tải lên. Phiên tạo trước khi bỏ việc nạp ảnh máy
+       * chụp có thể còn ảnh nguồn khác — không hiện cho khách nữa.
+       */
+      photos: listPhotos(s.id).filter((p) => p.source === 'guest').map(publicPhoto),
       composites: listComposites(s.id).map(publicComposite),
     });
     return true;
   }
 
   /**
-   * Khách tải ảnh từ album điện thoại lên để ghép khung.
+   * Khách tải ảnh từ điện thoại lên để ghép khung — đường DUY NHẤT để ảnh
+   * vào phiên. Quán đưa file ảnh cho khách (AirDrop, Zalo...), khách chọn
+   * từ album rồi tải lên đây.
    *
    * Lưu thành ảnh THẬT của phiên (originals + previews) chứ không để nằm
    * riêng trên điện thoại: bước dựng lại ảnh nét ở /api/composites tra ảnh
@@ -803,11 +703,10 @@ async function handleApi(ctx: Ctx): Promise<boolean> {
     try {
       const data = await readBody(req);
       if (data.length === 0) { json(res, 400, { error: 'Không có dữ liệu ảnh' }); return true; }
-      const r = await addPhoto(s, data, 'guest');
+      const r = await addPhoto(s, data);
       json(res, 200, { photo: publicPhoto(r.photo), remaining: r.remaining });
     } catch (err) {
       if (err instanceof CaptureError) {
-        // Thông điệp của addPhoto viết cho máy chụp — khách cần câu khác.
         const msg = err.code === 'full'
           ? 'Phiên đã đủ số ảnh tối đa, không thêm được nữa'
           : err.code === 'bad_image'
@@ -1173,6 +1072,15 @@ export function start(port = CONFIG.port) {
     try {
       if (await handleApi(ctx)) return;
       if (await handleMedia(ctx)) return;
+      /*
+       * API không tồn tại thì trả 404 JSON, không rơi xuống trang HTML. Máy
+       * cũ còn gọi API đã bỏ (agent nạp ảnh, /api/capture) sẽ nhận lỗi rõ ràng
+       * thay vì một trang nhân viên kèm mã 200 trông như thành công.
+       */
+      if (ctx.url.pathname.startsWith('/api/')) {
+        json(res, 404, { error: 'Không tìm thấy' });
+        return;
+      }
       serveStatic(ctx);
     } catch (err) {
       console.error('Lỗi xử lý', ctx.url.pathname, err);

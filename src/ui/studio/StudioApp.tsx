@@ -86,7 +86,11 @@ export default function StudioApp() {
         setSession(r.session);
         setAvailable(r.photos);
         setFrames(fr.frames.map(toFrame));
-        // Phiên chưa có ảnh vẫn vào được: khách lấy ảnh từ album ở bước chọn ảnh.
+        /*
+         * Chỉ có ảnh KHÁCH đã tải lên trước đó (mở lại trang, ghép tấm thứ
+         * hai). Ảnh máy chụp không còn về hệ thống — quán gửi file cho khách,
+         * khách tải lên ở bước chọn ảnh.
+         */
         setStep('frame');
       })
       .catch((e) => { setError(e.message); setStep('error'); });
@@ -114,7 +118,8 @@ export default function StudioApp() {
   }
 
   /**
-   * Khách chọn ảnh trong album điện thoại -> gửi lên phiên -> thêm vào lưới.
+   * Khách chọn ảnh quán đã gửi (nằm trong album điện thoại) -> gửi lên phiên
+   * -> thêm vào lưới.
    *
    * Tuần tự từng ảnh: giải nén vài ảnh 12–48MP song song là cách nhanh nhất
    * làm Safari tự tải lại trang. Ảnh hỏng thì bỏ qua, gửi tiếp ảnh còn lại.
@@ -245,7 +250,7 @@ export default function StudioApp() {
         <div className="body center">
           <div className="loading">
             <div className="spinner" />
-            <p className="muted">Đang tải ảnh của bạn...</p>
+            <p className="muted">Đang mở...</p>
           </div>
         </div>
       </div>
@@ -336,7 +341,6 @@ export default function StudioApp() {
           <span className="brand">
             <span className="n">1900</span><span className="w">Retrofoto</span>
           </span>
-          <span className="meta">{available.length} ảnh</span>
         </div>
         <div className="body">
           {frames.length > 0 ? (
@@ -394,7 +398,7 @@ export default function StudioApp() {
             {done
               ? 'Đã đủ ảnh — bấm Tiếp tục'
               : available.length === 0
-                ? 'Bấm "Ảnh trong máy" để lấy ảnh từ album'
+                ? 'Bấm "Tải ảnh lên" để chọn ảnh quán đã gửi bạn'
                 : chosen.length === 0
                   ? 'Chạm chọn ảnh theo thứ tự bạn muốn'
                   : 'Chưa đủ cũng được — vào ghép rồi thêm ảnh sau'}
@@ -424,7 +428,7 @@ export default function StudioApp() {
                 }}
               />
               <span className="plus">+</span>
-              <span className="add-label">Ảnh trong máy</span>
+              <span className="add-label">Tải ảnh lên</span>
             </label>
 
             {available.map((p) => {
@@ -794,7 +798,7 @@ export default function StudioApp() {
                       }}
                     />
                     <span className="plus">+</span>
-                    <span className="add-label">Ảnh trong máy</span>
+                    <span className="add-label">Tải ảnh lên</span>
                   </label>
                   {available.map((p) => {
                     // Ảnh đang nằm ở ô nào — để khách khỏi chọn trùng mà không biết

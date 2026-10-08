@@ -8,12 +8,11 @@ BUOC 1: Chuot phai vao file  CAI-DAT.bat
         (Bat buoc phai chon dong nay.
          Nhap dup binh thuong se bao loi.)
 
-BUOC 2: Dien 4 o hien ra:
+BUOC 2: Dien 3 o hien ra:
 
         - Mat khau nhan vien: tu dat, tu 4 ky tu
         - Thu muc luu anh:    doi sang o con nhieu
                               cho trong, vd E:\photobooth
-        - Thu muc may anh:    doi giong o tren, vd E:\Anh
         - Cong:               de nguyen 8090
 
 BUOC 3: Bam nut "Cai dat"
@@ -112,9 +111,12 @@ Trang trang, khong hien gi
 Cong bi chiem
    -> Chay lai CAI-DAT.bat, doi Cong thanh 8095.
 
-Bam "Da chup xong" ma khong thay anh
-   -> Anh phai nam trong thu muc ten dung
-      bang 4 so cua ma, vd E:\Anh\8206\
+Khach khong tai duoc anh len
+   -> Bao "da du so anh toi da": trang quan
+      ly, dong "Khach tai len toi da ... anh"
+      -> bam Doi de tang.
+   -> Bao "anh khong doc duoc": gui lai cho
+      khach file anh khac.
 
 Chi tiet hon: mo file HUONG-DAN.md
 

@@ -230,29 +230,6 @@ body {
   font-weight: 600;
 }
 
-/* ---------- Đang chụp ---------- */
-
-.counter .big {
-  font-family: var(--mono);
-  font-size: clamp(56px, 15vh, 132px);
-  font-weight: 700;
-  line-height: .95;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.04em;
-}
-
-.counter p {
-  margin: 8px 0 0;
-  font-size: clamp(15px, 1.6vw, 20px);
-  color: var(--text-2);
-}
-
-/*
- * Lưới ô đếm ảnh đã bỏ cùng lúc với gói chụp theo số kiểu: không còn con số
- * "tổng số kiểu" nào để vẽ ô chờ, mà vẽ theo trần an toàn (100) thì vừa vô
- * nghĩa vừa tràn màn hình. Giờ chỉ còn một con số to duy nhất.
- */
-
 .actions {
   display: flex;
   gap: 12px;

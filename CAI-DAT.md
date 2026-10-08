@@ -93,17 +93,15 @@ cd E:\photobook
 powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1 `
   -Port 8090 `
   -DataDir "D:\photobooth" `
-  -CaptureDir "D:\Anh" `
   -Password "matkhau-cua-ban"
 ```
 
-Sửa 4 tham số cho đúng máy bạn:
+Sửa 3 tham số cho đúng máy bạn:
 
 | Tham số | Nghĩa | Gợi ý |
 |---|---|---|
 | `-Port` | Cổng chạy | `8090`. Tránh `8080` vì hay bị XAMPP chiếm |
 | `-DataDir` | Nơi lưu ảnh khách + database | Chọn ổ còn nhiều chỗ |
-| `-CaptureDir` | Nơi phần mềm máy ảnh lưu ảnh | Xem bước 6 |
 | `-Password` | Mật khẩu trang nhân viên | **Đổi đi**, đừng để mặc định |
 
 Script sẽ tự động:
@@ -131,19 +129,14 @@ Từ lần khởi động máy sau, server tự chạy, không cần bấm gì.
 
 ---
 
-## Bước 6 — Nối phần mềm máy ảnh
+## Bước 6 — Ảnh của khách
 
-Hệ thống lấy ảnh bằng cách **đọc thư mục**, không cần cắm dây trực tiếp.
+Hệ thống **không lấy ảnh từ máy chụp**: không cần trỏ phần mềm máy ảnh vào
+thư mục nào, không cần agent.
 
-Cách hoạt động: khi tạo mã cho khách, hệ thống tự tạo thư mục tên đúng bằng
-mã đó, ví dụ `D:\Anh\8206\`. Bạn chỉ cần trỏ phần mềm máy ảnh
-(EOS Utility, digiCamControl…) lưu ảnh vào thư mục đó.
-
-Khi khách bấm **"Đã chụp xong"**, hệ thống quét thư mục và nạp ảnh vào phiên.
-
-**Cách làm thực tế:** trỏ phần mềm máy ảnh vào thư mục gốc `D:\Anh`, rồi mỗi
-lượt khách tạo thư mục con tên bằng mã. Hoặc dùng agent theo dõi thư mục
-(xem [README.md](README.md), mục *Lấy ảnh từ máy chụp*) để ảnh tự chảy về.
+Quán tự gửi file ảnh cho khách (AirDrop, Zalo, …). Khách bấm **"Đã chụp
+xong"** ở phòng → quét QR → chọn khung → bấm **"Tải ảnh lên"** để chọn ảnh
+quán vừa gửi → ghép → tải về.
 
 ---
 
@@ -193,10 +186,9 @@ Tự đóng vai khách một lần:
 
 1. Trang nhân viên → tạo mã cho phòng 1
 2. Vào PC phòng 1, nhập mã đó
-3. Chép vài ảnh vào `D:\Anh\<mã>\`
-4. Bấm **"Đã chụp xong"** → hiện 2 QR
-5. Dùng điện thoại (**phải nối WiFi quán**) quét QR ghép khung
-6. Chọn khung, ghép ảnh, tải về
+3. Bấm **"Đã chụp xong"** → hiện mã QR
+4. Dùng điện thoại (**phải nối WiFi quán**) quét QR ghép khung
+5. Chọn khung → **Tải ảnh lên** vài ảnh trong máy → ghép → tải về
 
 Chạy trót lọt là hệ thống sẵn sàng.
 
@@ -243,10 +235,12 @@ khác, ví dụ `-Port 8095`. Nhớ **tạo lại shortcut PC phòng** với c�
 Mở `.env.local` ở thư mục gốc bằng Notepad, xem dòng `PHOTOBOOTH_PASSWORD`.
 Sửa được luôn, sửa xong khởi động lại server.
 
-### Bấm "Đã chụp xong" mà không thấy ảnh
+### Khách không tải được ảnh lên
 
-Ảnh chưa nằm đúng thư mục. Mở File Explorer, kiểm tra `D:\Anh\<mã>\` — tên
-thư mục phải **đúng bằng 4 số** của mã, và ảnh phải nằm ngay trong đó.
+- **"Phiên đã đủ số ảnh tối đa"**: tăng trần ở trang nhân viên ("Khách tải lên
+  tối đa N ảnh mỗi phiên" → *Đổi*). Chỉ áp cho phiên tạo sau khi đổi.
+- **"Ảnh này không đọc được"**: file hỏng hoặc không phải ảnh — gửi lại file khác.
+- **Không mở được trang**: xem mục *Điện thoại không mở được QR* ở trên.
 
 ---
 
@@ -293,6 +287,5 @@ Mở `.env.local` để chỉnh. Sửa xong phải khởi động lại server.
 | `PHOTOBOOTH_ROOMS` | `1,2,3` | Danh sách phòng |
 | `PHOTOBOOTH_RETENTION_DAYS` | `7` | Số ngày giữ ảnh |
 | `PHOTOBOOTH_CODE_TTL` | `120` | Mã 4 số hết hạn sau bao nhiêu phút |
-| `PHOTOBOOTH_CAPTURE` | *(trống)* | Thư mục máy ảnh lưu ảnh vào |
 
 Muốn hiểu sâu hơn về cách hệ thống hoạt động, đọc [README.md](README.md).

@@ -7,9 +7,6 @@ cd /d "E:\photobook"
 REM Thu muc chua database va anh khach
 set PHOTOBOOTH_DATA=D:\photobooth
 
-REM Thu muc phan mem Canon luu anh vao
-set PHOTOBOOTH_CAPTURE=D:\Anh
-
 REM DOI mat khau nay truoc khi dung that
 set PHOTOBOOTH_PASSWORD=doi-mat-khau-nay
 

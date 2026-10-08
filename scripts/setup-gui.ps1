@@ -100,7 +100,6 @@ function Add-Field($label, $default, $hint) {
 
 $tbPass = Add-Field "Mat khau nhan vien" "" "Dung de dang nhap trang quan ly"
 $tbData = Add-Field "Thu muc luu anh" "D:\photobooth" "Chon o con nhieu dung luong"
-$tbCap = Add-Field "Thu muc may anh" "D:\Anh" "Noi phan mem may anh luu anh vao"
 $tbPort = Add-Field "Cong" "8090" "De nguyen neu khong biet"
 
 # --- Nut Cai dat ---
@@ -124,7 +123,6 @@ $form.Controls.Add($status)
 $btn.Add_Click({
     $pass = $tbPass.Text.Trim()
     $data = $tbData.Text.Trim()
-    $cap = $tbCap.Text.Trim()
     $port = $tbPort.Text.Trim()
 
     if ($pass.Length -lt 4) {
@@ -151,7 +149,6 @@ $btn.Add_Click({
       $status.Text = "Dang tao thu muc..."
       $form.Refresh()
       New-Item -ItemType Directory -Path $data -Force | Out-Null
-      if ($cap) { New-Item -ItemType Directory -Path $cap -Force | Out-Null }
 
       # --- 2. Ghi cau hinh ---
       $status.Text = "Dang ghi cau hinh..."
@@ -161,7 +158,9 @@ $btn.Add_Click({
       $conf['PHOTOBOOTH_DATA'] = $data
       $conf['PHOTOBOOTH_PASSWORD'] = $pass
       $conf['PHOTOBOOTH_PORT'] = $port
-      if ($cap) { $conf['PHOTOBOOTH_CAPTURE'] = $cap }
+      # Ban cu co o "Thu muc may anh" - he thong khong lay anh tu may chup
+      # nua (quan tu dua file cho khach), bo khoa cu cho file cau hinh gon.
+      $conf.Remove('PHOTOBOOTH_CAPTURE')
 
       # Chi hien phong 2 va 3 o trang quan ly.
       #

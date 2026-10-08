@@ -99,7 +99,8 @@ if (-not $Force) {
 # install-windows.ps1 tu thoi truoc - may da tung cai duong do van con sot lai.
 Write-Host "  Dang bo tac vu tu chay..." -ForegroundColor Gray
 $removedTask = 0
-foreach ($t in @((Get-TaskName), (Get-WatchTaskName), 'PhotoBoothStudio')) {
+# 1900Retrofoto-Agent: tac vu agent lay anh cua ban truoc v1.18
+foreach ($t in @((Get-TaskName), (Get-WatchTaskName), 'PhotoBoothStudio', '1900Retrofoto-Agent')) {
   cmd.exe /c "schtasks /Query /TN $t >nul 2>&1"
   if ($LASTEXITCODE -ne 0) { continue }
   cmd.exe /c "schtasks /End /TN $t >nul 2>&1"

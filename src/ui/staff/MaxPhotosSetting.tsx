@@ -2,16 +2,16 @@ import { useEffect, useState } from 'react';
 import { staffSettings, saveStaffSettings, type StaffSettings } from '../../api';
 
 /**
- * Trần ảnh cho MỌI phiên tạo mới.
+ * Trần số ảnh khách được tải lên, cho MỌI phiên tạo mới.
  *
  * Đây là thiết lập của quán, không phải lựa chọn từng lượt khách — nên nó nằm
  * lặng lẽ dưới đáy thẻ "Tạo phiên chụp", chữ nhỏ và xám, phải bấm "Đổi" mới
  * sửa được. Nút nhân viên bấm cả trăm lần mỗi ngày là "Tạo mã"; thứ vài tháng
  * mới đụng tới một lần thì không được tranh chỗ với nó.
  *
- * Vì sao vẫn cần một cái trần: nếu thư mục chụp bị trỏ nhầm vào kho ảnh cũ,
- * "Đã chụp xong" sẽ nạp sạch kho đó vào phiên của khách. Có trần thì thiệt
- * hại dừng ở một con số, không phải cả ổ đĩa.
+ * Vì sao vẫn cần một cái trần: ảnh vào phiên chỉ còn đường khách tự tải lên
+ * từ điện thoại. Không có trần thì một người cầm link có thể đẩy cả album
+ * hàng nghìn tấm lên, lấp đầy ổ đĩa của quán.
  */
 export default function MaxPhotosSetting() {
   const [cfg, setCfg] = useState<StaffSettings | null>(null);
@@ -54,7 +54,7 @@ export default function MaxPhotosSetting() {
   if (!editing) {
     return (
       <p className="setting-row">
-        <span>Tối đa <b>{cfg.maxPhotosPerSession}</b> ảnh mỗi phiên</span>
+        <span>Khách tải lên tối đa <b>{cfg.maxPhotosPerSession}</b> ảnh mỗi phiên</span>
         <button className="link" onClick={open}>Đổi</button>
       </p>
     );
@@ -62,7 +62,7 @@ export default function MaxPhotosSetting() {
 
   return (
     <div className="setting-edit">
-      <label htmlFor="max-photos">Số ảnh tối đa mỗi phiên</label>
+      <label htmlFor="max-photos">Số ảnh khách tải lên tối đa mỗi phiên</label>
       <div className="setting-edit-row">
         <input
           id="max-photos"

@@ -111,8 +111,7 @@ export const staffRooms = () =>
  */
 export const createSession = (room: string, priceId?: string) =>
   req<{
-    id: string; code: string; maxPhotos: number;
-    room: string; captureDir: string | null;
+    id: string; code: string; maxPhotos: number; room: string;
   }>('/api/staff/sessions', {
     method: 'POST',
     body: JSON.stringify({ room, priceId }),
@@ -261,44 +260,11 @@ export const claimCode = (room: string, code: string) =>
 export const roomSession = (room: string) =>
   req<{
     session: SessionInfo | null;
-    photos?: PhotoInfo[];
     qr?: GuestQr | null;
     locked?: boolean;
-    /** Agent theo dõi thư mục có đang chạy cho phòng này không. */
-    agent?: boolean;
-    /** Đã cấu hình thư mục chụp chưa. */
-    captureEnabled?: boolean;
-    /** Đường dẫn thư mục của phiên — hiện cho nhân viên trỏ phần mềm Canon vào. */
-    captureDir?: string | null;
   }>(`/api/room/session?room=${encodeURIComponent(room)}`);
 
-export type IntakeResult = {
-  found: number;
-  added: number;
-  total: number;
-  skippedFull: number;
-  failed: number;
-  dir: string;
-};
-
-/** Quét thư mục của phiên và nạp ảnh — gọi khi khách bấm "Đã chụp xong". */
-export const intakeRoom = (room: string) =>
-  req<IntakeResult>(`/api/room/intake?room=${encodeURIComponent(room)}`, {
-    method: 'POST',
-  });
-
-/**
- * Gửi một ảnh lên phiên đang mở.
- *
- * Giao diện KHÔNG dùng hàm này nữa (đã bỏ nút thêm ảnh tay) — giữ lại vì
- * agent theo dõi thư mục vẫn gọi cùng endpoint, và để test dùng được.
- */
-export const capture = (room: string, file: File) =>
-  req<{ photo: PhotoInfo; count: number; remaining: number }>(
-    `/api/capture?room=${encodeURIComponent(room)}`,
-    { method: 'POST', headers: { 'content-type': file.type }, body: file },
-  );
-
+/** Khách chụp xong -> chuyển phiên sang chờ ghép, lấy QR. */
 export const finishRoom = (room: string) =>
   req<{ qr: GuestQr }>(`/api/room/finish?room=${encodeURIComponent(room)}`, {
     method: 'POST',

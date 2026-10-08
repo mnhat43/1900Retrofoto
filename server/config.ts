@@ -65,18 +65,6 @@ export const CONFIG = {
   rooms: (process.env.PHOTOBOOTH_ROOMS ?? '1,2,3').split(',').map((s) => s.trim()),
 
   /**
-   * Thư mục gốc nơi phần mềm Canon lưu ảnh.
-   *
-   * Khi nhân viên tạo mã, server tạo sẵn thư mục con tên đúng bằng mã đó
-   * (ví dụ D:\Anh\5680\). Nhân viên trỏ phần mềm chụp vào thư mục này, và khi
-   * khách bấm "Đã chụp xong" server quét đúng thư mục ấy.
-   *
-   * Nhờ mỗi phiên một thư mục riêng, ảnh không thể lẫn giữa các khách —
-   * kể cả khi hai phòng chụp cùng lúc.
-   */
-  captureRoot: process.env.PHOTOBOOTH_CAPTURE ?? '',
-
-  /**
    * Cạnh dài tối đa của ảnh preview mà điện thoại tải về.
    * Phải khớp PREVIEW_MAX_EDGE trong src/media/assets.ts — ô trong dải chỉ
    * rộng ~500px @300DPI nên 1400px là thừa đủ cho cả export.

@@ -36,7 +36,7 @@ $AssetName = '1900Retrofoto.zip'
 
 # Thieu mot trong nhung thu muc nay thi goi chua giai nen xong - chan tu dau
 # thay vi thay nua chung roi de quan khong co server.
-$CodeDirs = @('server', 'src', 'dist', 'public', 'agent', 'node_modules', 'runtime')
+$CodeDirs = @('server', 'src', 'dist', 'public', 'node_modules', 'runtime')
 
 # Thu cua RIENG ban dang chay, khong duoc de ban moi de len.
 $Keep = @('.env.local', 'logs')
@@ -328,6 +328,20 @@ if (@(Get-ServerProcess $OldDir).Count -gt 0) {
   Start-Sleep -Seconds 3
 }
 Say "[ok] Da dung server ($stopped tien trinh)" 'Green'
+
+# --- 6b. Go agent lay anh cua ban cu ---
+#
+# Tu v1.18 he thong khong lay anh tu may chup nua: quan tu dua file cho
+# khach, khach tai len o trang ghep khung. Ban cu co the con tac vu agent
+# chay ngam - de lai thi no cu goi vao API da bo, va file cua no nam lai mai
+# trong thu muc cai dat vi buoc 7 chi thay nhung gi goi moi co.
+cmd.exe /c "schtasks /End /TN 1900Retrofoto-Agent >nul 2>&1"
+cmd.exe /c "schtasks /Delete /TN 1900Retrofoto-Agent /F >nul 2>&1"
+foreach ($old in @('agent', 'Chay-agent.cmd', 'Chay-agent-am-tham.cmd',
+    'Chay-agent-ngam.vbs', 'CAI-AGENT.bat', 'cai-agent.ps1')) {
+  $p = Join-Path $OldDir $old
+  if (Test-Path $p) { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
+}
 
 # --- 7. Thay file chuong trinh ---
 #

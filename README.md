@@ -15,18 +15,23 @@ không tài khoản bên ngoài, không chi phí. Ảnh không rời khỏi máy
 Nhân viên CHỌN PHÒNG + tạo gói chụp  ──►  mã 4 số  ──►  đưa khách
                                                           │
 Khách vào đúng phòng đó, nhập mã trên màn hình  ◄─────────┘
+   (hoặc LumaBooth bắt đầu chụp -> tự nhận mã)
               │
-          chụp ảnh  ──►  bấm "Đã chụp xong"  ──►  server lấy ảnh từ thư mục
+          chụp ảnh  ──►  bấm "Đã chụp xong"
               │
-     màn hình hiện 2 mã QR ──► khách quét bằng điện thoại
-                                     │
-                    ┌────────────────┴────────────────┐
-              "Xem ảnh"                        "Ghép khung"
-              tải ảnh gốc           chọn khung → chọn ảnh → chỉnh
-                                    → lưu → Tải xuống / Chép link
+     màn hình hiện mã QR ghép khung ──► khách quét bằng điện thoại
+              │
+     quán gửi file ảnh cho khách (AirDrop, Zalo...)
+              │
+     khách: chọn khung → TẢI ẢNH LÊN → chỉnh → lưu → Tải xuống
               │
 Nhân viên bấm "Đóng phiên"  ──►  phòng rảnh, nhận khách tiếp theo
 ```
+
+**Hệ thống không lấy ảnh từ máy chụp.** Quán tự đưa file ảnh cho khách, và
+đường duy nhất để ảnh vào phiên là khách tải lên ở trang ghép khung
+(`/api/s/photos`). Không có agent, không quét thư mục, không cấu hình thư mục
+máy ảnh. Server vẫn giữ ảnh gốc khách tải lên để dựng bản ghép nét.
 
 ## Mỗi phòng một phiên
 
@@ -152,7 +157,6 @@ Nếu muốn khách xem được từ nhà: thêm Cloudflare Tunnel — kiến t
 | `PHOTOBOOTH_ROOMS` | `1,2,3` | Danh sách phòng |
 | `PHOTOBOOTH_RETENTION_DAYS` | `7` | Số ngày giữ ảnh |
 | `PHOTOBOOTH_CODE_TTL` | `120` | Mã 4 số hết hạn sau bao nhiêu phút |
-| `PHOTOBOOTH_CAPTURE` | *(trống)* | Thư mục gốc nơi máy ảnh lưu ảnh — xem mục dưới |
 | `PHOTOBOOTH_HOST` | *(tự dò)* | `ip:cổng` in vào mã QR. **Nên ghim** — xem mục dưới |
 | `PHOTOBOOTH_DISK_WARN_GB` | `20` | Còn dưới mức này thì đèn ổ đĩa vàng |
 | `PHOTOBOOTH_DISK_CRIT_GB` | `5` | Còn dưới mức này thì đèn ổ đĩa đỏ |
@@ -300,63 +304,27 @@ npm run verify        # chạy tất cả kiểm chứng bên dưới
 | `verify:api` | 27 kiểm tra API gồm cả bảo mật (token, chống dò, phân quyền) |
 | `verify:flow` | Trọn luồng bằng trình duyệt thật: NV → phòng → khách → file trên đĩa |
 | `verify:rooms` | Mỗi phòng một phiên, đóng phiên mới giải phóng phòng |
-| `verify:intake` | Lấy ảnh theo thư mục mã, không lẫn giữa các phiên |
+| `verify:trigger` | LumaBooth bắt đầu chụp thì tự nhận mã của phòng |
 | `verify:cache` | HTML không cache — tránh trình duyệt kẹt bản cũ |
 | `verify:noscroll` | Không màn nào bị cuộn ngoài ý muốn (5 cỡ màn) |
 
-`npm run screenshot:flow` chụp 9 màn hình của cả luồng vào `scratch/`.
+`npm run screenshot:flow` chụp 12 màn hình của cả luồng vào `scratch/`.
 
-## Lấy ảnh từ máy chụp
+## Ảnh vào phiên thế nào
 
-Mỗi phiên có **một thư mục riêng đặt tên bằng mã 4 số**, tạo sẵn ngay khi nhân
-viên tạo mã. Khách chụp xong bấm **"Đã chụp xong"**, server quét đúng thư mục đó.
+Chỉ một đường: **khách tự tải lên** ở trang ghép khung. Quán gửi file ảnh cho
+khách (AirDrop, Zalo...), khách chọn từ album điện thoại.
 
-Nhờ mỗi phiên một thư mục, ảnh **không thể lẫn giữa các khách** — kể cả khi hai
-phòng chụp cùng lúc.
+- Chỉ nhận khi phiên đã **chụp xong** (màn phòng đã hiện QR) — trước đó khách
+  chưa có link.
+- Mỗi phiên tối đa **N ảnh** (trang nhân viên → "Khách tải lên tối đa N ảnh
+  mỗi phiên", mặc định 100). Đây là lưới an toàn cho ổ đĩa.
+- Ảnh gốc khách tải lên được giữ trên server để dựng bản ghép nét; điện thoại
+  chỉ tải bản thu nhỏ 1400px để ghép.
+- Trang khách chỉ hiện ảnh nguồn `guest`. Phiên cũ còn ảnh máy chụp (trước khi
+  bỏ việc nạp ảnh) thì ảnh đó không hiện cho khách, nhân viên vẫn xem được.
 
-**Cài đặt:** thêm vào `.env.local`:
-
-```
-PHOTOBOOTH_CAPTURE=D:\Anh
-```
-
-Luồng làm việc:
-
-```
-Nhân viên tạo mã 5680
-    -> server tạo D:\Anh.80\  và hiện đường dẫn trên màn hình
-    -> nhân viên trỏ phần mềm Canon lưu vào thư mục đó
-
-Khách nhập mã ở phòng -> chụp -> bấm "Đã chụp xong"
-    -> server quét D:\Anh.80\ -> ảnh hiện lên -> hiện QR
-```
-
-Màn hình phòng hiện sẵn đường dẫn để nhân viên khỏi phải nhớ.
-
-### Hành vi đã kiểm chứng
-
-| Tình huống | Xử lý |
-|---|---|
-| Thư mục trống | Báo rõ kèm đường dẫn, có nút **Quét lại** — không im lặng bỏ qua |
-| Bấm quét nhiều lần | Không nhân đôi ảnh (nhớ theo tên file gốc) |
-| Chụp thêm rồi quét lại | Chỉ lấy ảnh mới |
-| Vượt số ảnh của gói | Dừng, không nhận thêm |
-| File không phải ảnh | Bỏ qua |
-| Hai phòng chụp cùng lúc | Mỗi phòng chỉ lấy ảnh thư mục của mình |
-| Ảnh gốc trong thư mục | **Không đụng vào** — chỉ đọc, không di chuyển/xoá |
-
-> **Không còn cách thêm ảnh thủ công.** Toàn bộ ảnh vào qua thư mục. Nếu chưa
-> đặt `PHOTOBOOTH_CAPTURE`, màn hình phòng báo lỗi rõ và phòng đó không nhận
-> được ảnh nào — phải cấu hình xong mới dùng được.
-
-### Chưa cấu hình `PHOTOBOOTH_CAPTURE`?
-
-Màn hình phòng báo **"Hệ thống đang gặp lỗi — vui lòng liên hệ nhân viên"** và
-nút "Đã chụp xong" bị khoá.
-
-Màn hình phòng là thứ **khách nhìn**, nên mọi lỗi đều hiện chung chung như vậy:
-không lộ đường dẫn thư mục hay tên biến cấu hình. Chi tiết kỹ thuật ghi ở cửa sổ
-console của server để nhân viên tra khi cần.
-
-Cách sửa: đặt `PHOTOBOOTH_CAPTURE` trong `.env.local` rồi khởi động lại server.
+Bản cũ có agent lấy ảnh (`agent/watcher.ts`, `CAI-AGENT.bat`) và quét thư mục
+máy ảnh (`PHOTOBOOTH_CAPTURE`) — đều đã bỏ. `CAP-NHAT.bat` tự gỡ tác vụ agent
+và file của nó trên máy quán khi cập nhật lên bản này.
 

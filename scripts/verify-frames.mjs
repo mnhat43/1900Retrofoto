@@ -8,14 +8,12 @@
  *   node --experimental-strip-types scripts/verify-frames.mjs
  */
 import { chromium, devices } from 'playwright';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const dataDir = mkdtempSync(join(tmpdir(), 'pb-vf-'));
-const captureRoot = mkdtempSync(join(tmpdir(), 'pb-vfc-'));
 process.env.PHOTOBOOTH_DATA = dataDir;
-process.env.PHOTOBOOTH_CAPTURE = captureRoot;
 process.env.PHOTOBOOTH_PASSWORD = 't';
 process.env.PHOTOBOOTH_PORT = '8187';
 process.env.PHOTOBOOTH_HOST = '127.0.0.1:8187';
@@ -146,17 +144,17 @@ const s = (await api('/api/staff/sessions', {
 })).body;
 await api('/api/room/claim', { method: 'POST', body: JSON.stringify({ room: '1', code: s.code }) });
 
-mkdirSync(join(captureRoot, s.code), { recursive: true });
+const fin = await api('/api/room/finish?room=1', { method: 'POST' });
+// Khách tải 8 ảnh quán gửi lên — đường duy nhất để ảnh vào phiên
+const tok = fin.body.qr.composeUrl.split('/c/')[1];
 for (let i = 0; i < 8; i++) {
-  writeFileSync(
-    join(captureRoot, s.code, `I${i}.jpg`),
-    await sharp({
+  await api(`/api/s/photos?t=${tok}`, {
+    method: 'POST', headers: { 'content-type': 'image/jpeg' },
+    body: await sharp({
       create: { width: 1200, height: 900, channels: 3, background: { r: 210, g: 40 + i * 20, b: 90 } },
     }).jpeg().toBuffer(),
-  );
+  });
 }
-await api('/api/room/intake?room=1', { method: 'POST' });
-const fin = await api('/api/room/finish?room=1', { method: 'POST' });
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ ...devices['iPhone 13'] });
@@ -545,7 +543,6 @@ check('KHÔNG còn hộp thoại nào của trình duyệt', native === 0, `${na
 
 await browser.close();
 server.close();
-rmSync(captureRoot, { recursive: true, force: true });
 
 if (fails.length) {
   console.log(`\nFAIL: ${fails.length} kiểm tra`);

@@ -18,8 +18,6 @@
 param(
   [int]$Port = 8080,
   [string]$DataDir = "D:\photobooth",
-  # Thu muc goc noi phan mem may anh luu anh (de trong = them anh thu cong)
-  [string]$CaptureDir = "",
   [string]$Password = "",
   # Danh sach phong hien o trang quan ly. Mac dinh 2,3: phong 1 chay
   # LumaBooth chiem tron man hinh nen khach khong co cho nhap ma, se
@@ -169,7 +167,6 @@ $envText = @"
 PHOTOBOOTH_DATA=$DataDir
 PHOTOBOOTH_PASSWORD=$Password
 PHOTOBOOTH_PORT=$Port
-PHOTOBOOTH_CAPTURE=$CaptureDir
 PHOTOBOOTH_HOST=${ip}:${Port}
 PHOTOBOOTH_ROOMS=$Rooms
 "@
@@ -188,14 +185,12 @@ cd /d "__APPDIR__"
 set PHOTOBOOTH_DATA=__DATADIR__
 set PHOTOBOOTH_PASSWORD=__PASSWORD__
 set PHOTOBOOTH_PORT=__PORT__
-set PHOTOBOOTH_CAPTURE=__CAPTURE__
 node --experimental-strip-types --disable-warning=ExperimentalWarning server\index.ts
 '@
 $cmdText = $cmdText.Replace('__APPDIR__', $AppDir)
 $cmdText = $cmdText.Replace('__DATADIR__', $DataDir)
 $cmdText = $cmdText.Replace('__PASSWORD__', $Password)
 $cmdText = $cmdText.Replace('__PORT__', "$Port")
-$cmdText = $cmdText.Replace('__CAPTURE__', $CaptureDir)
 Set-Content -Path $startCmd -Value $cmdText -Encoding ascii
 Write-Host "  [ok] Tao start-server.cmd"
 

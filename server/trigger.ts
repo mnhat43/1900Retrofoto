@@ -18,56 +18,17 @@ import { createServer } from 'node:http';
  *   phòng 2 -> http://<máy chủ>:8102
  *   phòng 3 -> http://<máy chủ>:8103
  *
- * Vì sao cần: nếu chỉ dò thư mục, ta phải ĐOÁN ảnh thuộc khách nào dựa
- * trên thời điểm file xuất hiện — LumaBooth xử lý qua nhiều bước nên ảnh
- * có thể về trễ và chảy nhầm sang khách kế tiếp. Trigger cho biết CHÍNH
- * XÁC lượt chụp bắt đầu và kết thúc lúc nào.
+ * Vì sao còn cần: phòng chỉ có MỘT màn hình và LumaBooth chiếm trọn, khách
+ * không có chỗ gõ mã 4 số. Khi LumaBooth báo bắt đầu lượt chụp
+ * (session_start), server tự nhận hộ mã đang chờ của phòng đó.
  *
- * Các sự kiện LumaBooth gửi (theo tài liệu chính thức):
- *   session_start    [booth_mode]
- *   countdown_start  [seconds]
- *   countdown        [percent_complete]
- *   capture_start
- *   file_download    [tên file từ máy ảnh]
- *   processing_start [tên các ảnh gốc] [file cuối]
- *   sharing_screen
- *   printing         [file] [số bản] [máy in]
- *   file_upload      [file] [url] [loại] [album]
- *   session_end
- *
- * Ta chỉ quan tâm mốc mở/đóng lượt chụp; ảnh vẫn do agent mang về.
+ * Hệ thống KHÔNG lấy ảnh từ máy chụp nữa (quán tự đưa file cho khách), nên
+ * các sự kiện khác chỉ được ghi log.
  */
-
-/** Một lượt chụp LumaBooth đang mở ở phòng nào, từ lúc nào. */
-export type Shot = {
-  /** Thời điểm session_start — ảnh cũ hơn mốc này không thuộc lượt này. */
-  startedAt: number;
-  /** booth_mode LumaBooth báo (PrintAndGIF, Video...). Chỉ để ghi log. */
-  mode: string;
-  /** Tên file LumaBooth đã báo trong lượt này, để đối chiếu với agent. */
-  files: Set<string>;
-};
-
-/** Dấu gạch ngược Windows — viết kiểu này để khỏi vướng escape. */
-const BS = String.fromCharCode(92);
-
-const shots = new Map<string, Shot>();
-
-/** Lượt chụp LumaBooth đang mở ở phòng này, nếu có. */
-export const shotForRoom = (room: string): Shot | null => shots.get(room) ?? null;
-
-/**
- * Mốc thời gian sớm nhất mà ảnh của phòng này được coi là hợp lệ.
- *
- * Không có lượt nào đang mở -> null, agent cứ gửi như cũ. Có lượt đang mở
- * -> ảnh chụp TRƯỚC lúc lượt bắt đầu là của khách trước, phải bỏ.
- */
-export const shotFloor = (room: string): number | null =>
-  shots.get(room)?.startedAt ?? null;
 
 export type TriggerResult = { event: string; room: string; note: string };
 
-/** Xử lý một sự kiện. Trả về mô tả ngắn để ghi log. */
+/** Mô tả ngắn một sự kiện để ghi log. Việc nhận mã do nơi gọi làm. */
 export function handleTrigger(
   room: string,
   event: string,
@@ -75,48 +36,15 @@ export function handleTrigger(
 ): TriggerResult {
   const p1 = params.param1 ?? '';
   const note = (s: string) => ({ event, room, note: s });
-
   switch (event) {
     case 'session_start':
-      shots.set(room, { startedAt: Date.now(), mode: p1, files: new Set() });
       return note(`mở lượt chụp (${p1 || 'không rõ chế độ'})`);
-
-    case 'file_download': {
-      // LumaBooth vừa kéo xong một ảnh từ máy ảnh — ghi tên để đối chiếu.
-      const s = shots.get(room);
-      if (s && p1) s.files.add(p1);
-      return note(p1 ? `máy ảnh trả về ${p1}` : 'máy ảnh trả về ảnh');
-    }
-
-    case 'processing_start': {
-      /*
-       * Tài liệu nói param1 = danh sách ảnh, param2 = file cuối. THỰC TẾ
-       * LumaBooth 8 gửi MỖI ảnh một param: param1..paramN là ảnh gốc, param
-       * cuối cùng là đường dẫn đầy đủ của file đã ghép. Nhận diện bằng dấu
-       * phân cách đường dẫn — tên ảnh gốc không có.
-       */
-      const s = shots.get(room);
-      if (s) {
-        for (const v of Object.values(params)) {
-          if (!v || v.includes(BS) || v.includes('/')) continue;
-          s.files.add(v.trim());
-        }
-      }
-      return note(`chốt ${s?.files.size ?? 0} ảnh của lượt`);
-    }
-
     case 'session_end':
-      shots.delete(room);
       return note('đóng lượt chụp');
-
-    // countdown/capture_start/sharing_screen/printing/file_upload: không cần xử lý
     default:
       return note('bỏ qua');
   }
 }
-
-/** Xoá trạng thái của một phòng — dùng khi nhân viên đóng phiên. */
-export const clearShot = (room: string): void => void shots.delete(room);
 
 /**
  * Mở một cổng HTTP riêng cho mỗi phòng để nhận trigger LumaBooth.
@@ -127,8 +55,8 @@ export const clearShot = (room: string): void => void shots.delete(room);
  * Cổng mặc định 8100 + số phòng (8101, 8102, 8103). Đổi được bằng
  * PHOTOBOOTH_TRIGGER_BASE nếu cổng đó đã có người dùng.
  *
- * Lỗi mở cổng chỉ ghi log rồi bỏ qua: trigger là phần tăng độ chính xác,
- * mất nó thì agent vẫn chạy như cũ — không đáng để server không lên.
+ * Lỗi mở cổng chỉ ghi log rồi bỏ qua: mất trigger thì khách vẫn nhập mã
+ * trên màn hình phòng được — không đáng để server không lên.
  */
 export function listenTriggerPorts(
   rooms: string[],

@@ -146,14 +146,33 @@ export async function loadPhotosFromUrls(
 const UPLOAD_MAX_EDGE = 4000;
 
 /**
+ * File JPEG/PNG lớn hơn mức này thì vẽ lại cho nhỏ thay vì gửi nguyên.
+ * Server nhận tối đa 64MB một lần gửi (server/http.ts); ảnh Canon 24MP chỉ
+ * khoảng 8–12MB nên luôn lọt, mức này chỉ chặn file bất thường.
+ */
+const UPLOAD_RAW_MAX_BYTES = 40 * 1024 * 1024;
+
+/** Định dạng server (sharp) đọc thẳng được, khỏi phải vẽ lại. */
+const RAW_OK_TYPES = ['image/jpeg', 'image/png'];
+
+/**
  * Chuẩn bị một ảnh trong album điện thoại để gửi lên phiên.
  *
- * Luôn vẽ lại thành JPEG thay vì gửi nguyên file:
- *   - iPhone lưu HEIC, server (sharp) không đọc được — trình duyệt thì đọc được.
- *   - Xoay theo EXIF ngay ở đây, khỏi phụ thuộc server hiểu EXIF của máy nào.
- *   - Ảnh 48MP của điện thoại mới gửi qua WiFi quán rất chậm; thu về ~12MP là đủ.
+ * JPEG/PNG gửi NGUYÊN FILE. Quán gửi ảnh máy ảnh qua Google Drive, khách tải
+ * về là có đúng file gốc 24MP — vẽ lại ở đây sẽ thu nhỏ còn 12MP và nén thêm
+ * một lần, làm ảnh ghép kém nét hơn hẳn luồng lấy ảnh từ máy chụp trước kia
+ * khi khách phóng to trong ô hoặc dùng khung một ảnh khổ lớn. Server tự xoay
+ * theo EXIF (capture.ts, render.ts) nên không cần xoay trước ở đây.
+ *
+ * Định dạng khác (HEIC của iPhone, WebP...) thì vẽ lại thành JPEG:
+ *   - Server (sharp) không đọc được HEIC — trình duyệt thì đọc được.
+ *   - Xoay theo EXIF ngay ở đây.
+ *   - Thu về ~12MP để nằm dưới trần canvas iOS và gửi qua WiFi cho nhanh.
  */
 export async function prepareUpload(file: File): Promise<Blob> {
+  if (RAW_OK_TYPES.includes(file.type) && file.size <= UPLOAD_RAW_MAX_BYTES) {
+    return file;
+  }
   const source = await createImageBitmap(file, { imageOrientation: 'from-image' });
   try {
     const scale = Math.min(1, UPLOAD_MAX_EDGE / Math.max(source.width, source.height));

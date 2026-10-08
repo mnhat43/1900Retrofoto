@@ -65,7 +65,7 @@ check('đúng mật khẩu thì vào được',
 
 console.log('\n--- Tạo gói chụp ---');
 const created = await api('/api/staff/sessions', {
-  method: 'POST', body: JSON.stringify({ room: '1', maxPhotos: 4 }),
+  method: 'POST', body: JSON.stringify({ room: '1', maxPhotos: 5 }),
 });
 const code = created.body.code;
 check('tạo được mã 4 số', /^\d{4}$/.test(code ?? ''), `got ${code}`);
@@ -88,38 +88,23 @@ check('mã DÙNG MỘT LẦN — phòng khác không dùng lại được',
     method: 'POST', body: JSON.stringify({ room: '2', code }),
   })).status !== 200);
 
-console.log('\n--- Chụp ảnh ---');
-const colors = [
-  { r: 220, g: 30, b: 60 }, { r: 30, g: 140, b: 220 },
-  { r: 40, g: 190, b: 90 }, { r: 240, g: 170, b: 40 },
-];
-let last;
-for (let i = 0; i < 4; i++) {
-  last = await api('/api/capture?room=1', {
-    method: 'POST',
-    headers: { 'content-type': 'image/jpeg' },
-    body: await makeJpeg(1600, 1200, colors[i]),
-  });
-}
-check('nhận đủ 4 ảnh', last.status === 200 && last.body.count === 4,
-  JSON.stringify(last.body));
-check('báo đúng số lượt còn lại', last.body.remaining === 0);
+console.log('\n--- Không còn nạp ảnh từ máy chụp ---');
+check('đường nạp ảnh máy chụp đã bỏ (/api/capture)',
+  (await api('/api/capture?room=1', {
+    method: 'POST', headers: { 'content-type': 'image/jpeg' },
+    body: await makeJpeg(800, 600, { r: 0, g: 0, b: 0 }),
+  })).status === 404);
+check('đường quét thư mục chụp đã bỏ (/api/room/intake)',
+  (await api('/api/room/intake?room=1', { method: 'POST' })).status === 404);
+check('đường agent đã bỏ (/api/agent/ping)',
+  (await api('/api/agent/ping?rooms=1', { method: 'POST' })).status === 404);
+const roomView = await api('/api/room/session?room=1');
+check('màn hình phòng không còn nhận danh sách ảnh',
+  roomView.status === 200 && roomView.body.photos === undefined, JSON.stringify(roomView.body).slice(0, 120));
 
-const over = await api('/api/capture?room=1', {
-  method: 'POST',
-  headers: { 'content-type': 'image/jpeg' },
-  body: await makeJpeg(800, 600, { r: 0, g: 0, b: 0 }),
-});
-check('vượt số ảnh của gói thì bị chặn',
-  over.status === 409 && over.body.reason === 'full', JSON.stringify(over.body));
-
-check('file không phải ảnh bị từ chối',
-  (await api('/api/capture?room=2', {
-    method: 'POST', body: Buffer.from('khong phai anh'),
-  })).status !== 200);
-
-console.log('\n--- Hoàn tất, sinh QR ---');
+console.log('\n--- Chụp xong, sinh QR (không cần có ảnh) ---');
 const fin = await api('/api/room/finish?room=1', { method: 'POST' });
+check('phiên chưa có ảnh nào vẫn hiện được QR', fin.status === 200, JSON.stringify(fin.body));
 check('sinh được mã QR ghép khung',
   fin.body.qr?.compose?.startsWith('data:image/png'));
 check('KHÔNG còn mã QR xem ảnh gốc',
@@ -132,10 +117,36 @@ check('QR KHÔNG chứa mã 4 số',
 const token = fin.body.qr.composeUrl.split('/c/')[1];
 check('token dài (không đoán được)', token.length >= 43, `len ${token.length}`);
 
-console.log('\n--- Khách dùng token ---');
+console.log('\n--- Khách tải ảnh quán gửi lên ---');
+const fresh = await api(`/api/s?t=${token}`);
+check('token đúng thì xem được phiên', fresh.status === 200);
+check('mới mở thì chưa có ảnh nào', fresh.body.photos?.length === 0, JSON.stringify(fresh.body.photos));
+
+const colors = [
+  { r: 220, g: 30, b: 60 }, { r: 30, g: 140, b: 220 },
+  { r: 40, g: 190, b: 90 }, { r: 240, g: 170, b: 40 },
+];
+let last;
+for (let i = 0; i < 4; i++) {
+  last = await api(`/api/s/photos?t=${token}`, {
+    method: 'POST',
+    headers: { 'content-type': 'image/jpeg' },
+    body: await makeJpeg(1600, 1200, colors[i]),
+  });
+}
+check('khách tải lên đủ 4 ảnh', last.status === 200 && !!last.body.photo?.id, JSON.stringify(last.body));
+check('báo đúng số chỗ còn lại (trần 5)', last.body.remaining === 1, JSON.stringify(last.body));
+check('file không phải ảnh bị từ chối',
+  (await api(`/api/s/photos?t=${token}`, {
+    method: 'POST', body: Buffer.from('khong phai anh'),
+  })).status === 400);
+check('token sai thì không tải ảnh lên được',
+  (await api('/api/s/photos?t=khong-hop-le', {
+    method: 'POST', body: await makeJpeg(100, 100, colors[0]),
+  })).status === 404);
+
 const guest = await api(`/api/s?t=${token}`);
-check('token đúng thì xem được phiên', guest.status === 200);
-check('thấy đủ 4 ảnh', guest.body.photos?.length === 4);
+check('thấy đủ 4 ảnh vừa tải', guest.body.photos?.length === 4);
 check('ảnh có kích thước đã xoay đúng',
   guest.body.photos?.[0]?.width === 1600 && guest.body.photos?.[0]?.height === 1200,
   JSON.stringify(guest.body.photos?.[0]));
@@ -150,31 +161,13 @@ const proxy = await api(`/media/previews/${pid}?t=${token}`);
 check('tải được ảnh proxy', proxy.status === 200 && proxy.body.byteLength > 1000);
 check('ảnh proxy nhỏ hơn ảnh gốc',
   proxy.body.byteLength < (await api(`/media/originals/${pid}?t=${token}`)).body.byteLength);
+check('ảnh khách có ảnh gốc để server dựng bản nét',
+  (await api(`/media/originals/${pid}?t=${token}`)).status === 200);
 
 const savedCookie = cookie; cookie = '';
 check('không token thì KHÔNG tải được ảnh',
   (await api(`/media/previews/${pid}`)).status === 401);
 cookie = savedCookie;
-
-console.log('\n--- Khách tải ảnh từ album ---');
-const albumJpeg = await makeJpeg(900, 1200, { r: 30, g: 140, b: 90 });
-const up = await api(`/api/s/photos?t=${token}`, {
-  method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: albumJpeg,
-});
-// Phiên này đã chụp kín trần 4 ảnh — ảnh album có hạn mức riêng nên vẫn phải lọt
-check('khách tải được ảnh album lên phiên (dù đã chụp kín trần)',
-  up.status === 200 && !!up.body.photo?.id,
-  JSON.stringify(up.body));
-check('ảnh album thành ảnh của phiên',
-  (await api(`/api/s?t=${token}`)).body.photos?.length === 5);
-check('ảnh album có ảnh gốc để server dựng bản nét',
-  (await api(`/media/originals/${up.body.photo?.id}?t=${token}`)).status === 200);
-check('token sai thì không tải ảnh album lên được',
-  (await api('/api/s/photos?t=khong-hop-le', { method: 'POST', body: albumJpeg })).status === 404);
-check('file không phải ảnh bị từ chối',
-  (await api(`/api/s/photos?t=${token}`, {
-    method: 'POST', body: Buffer.from('khong phai anh'),
-  })).status === 400);
 
 console.log('\n--- Lưu ảnh ghép ---');
 const recipe = encodeURIComponent(JSON.stringify({ frameId: 'basic-4', slots: [] }));
@@ -212,6 +205,13 @@ console.log('\n--- Xoay / lật ảnh khi dựng bản nét ---');
     method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: twoTone,
   });
   check('tải ảnh hai màu để thử xoay', up2.status === 200, JSON.stringify(up2.body));
+  const over = await api(`/api/s/photos?t=${token}`, {
+    method: 'POST',
+    headers: { 'content-type': 'image/jpeg' },
+    body: await makeJpeg(800, 600, { r: 0, g: 0, b: 0 }),
+  });
+  check('vượt trần ảnh của phiên thì bị chặn',
+    over.status === 409 && over.body.reason === 'full', JSON.stringify(over.body));
   const pid2 = up2.body.photo.id;
 
   const frames = (await api('/api/frames')).body.frames;

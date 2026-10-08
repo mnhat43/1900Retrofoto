@@ -49,33 +49,19 @@ export function getPhoto(sessionId: string, photoId: string): Photo | null {
     .get(photoId, sessionId) as Photo | undefined) ?? null;
 }
 
-/** Số ảnh album khách được tải thêm vào một phiên, ngoài trần ảnh chụp. */
-export const GUEST_EXTRA_PHOTOS = 30;
-
 export class CaptureError extends Error {
   // Không dùng parameter property — Node strip-types không hỗ trợ (sinh code runtime)
-  code: 'full' | 'closed' | 'bad_image' | 'duplicate';
-  constructor(message: string, code: 'full' | 'closed' | 'bad_image' | 'duplicate') {
+  code: 'full' | 'closed' | 'bad_image';
+  constructor(message: string, code: 'full' | 'closed' | 'bad_image') {
     super(message);
     this.code = code;
   }
 }
 
 /**
- * Nhận một ảnh vào phiên.
- *
- * Đây là HỢP ĐỒNG dùng chung cho cả upload thủ công (giai đoạn này) và app PC
- * điều khiển Canon (sau này) — hai bên gọi cùng hàm này, chỉ khác `source`.
- * Khi app Canon xong, server không phải sửa gì.
- *
- * Ghi 2 bản: ảnh gốc vào originals/ và bản thu nhỏ 1400px vào previews/.
- * Điện thoại tải bản preview — tiết kiệm ~90% băng thông WiFi mà không giảm
- * chất lượng, vì ô trong dải chỉ rộng ~500px @300DPI.
- */
-/**
  * Giữ chỗ một số thứ tự (seq) cho ảnh sắp tới — làm NGAY, trước mọi việc chậm.
  *
- * Máy ảnh chụp liên tiếp có thể gửi nhiều ảnh cùng lúc. Nếu đọc số ảnh hiện có
+ * Hai lần tải ảnh có thể tới cùng lúc (khách mở trang ở hai tab). Nếu đọc số ảnh hiện có
  * rồi mới xử lý ảnh (sharp mất vài trăm ms) thì hai request song song đều thấy
  * cùng một con số, tính ra cùng một seq, và một ảnh sẽ bị mất khi ghi database.
  *
@@ -87,7 +73,7 @@ function reserveSeq(sessionId: string, maxPhotos: number): { id: string; seq: nu
   for (let attempt = 0; attempt < maxPhotos + 5; attempt++) {
     const used = countPhotos(sessionId);
     if (used >= maxPhotos) {
-      throw new CaptureError('Đã chụp hết số ảnh của gói', 'full');
+      throw new CaptureError('Phiên đã đủ số ảnh tối đa', 'full');
     }
     const id = randomBytes(12).toString('hex');
     const seq = used + 1;
@@ -105,43 +91,29 @@ function reserveSeq(sessionId: string, maxPhotos: number): { id: string; seq: nu
   throw new CaptureError('Không giữ được chỗ cho ảnh', 'full');
 }
 
+/**
+ * Nhận một ảnh KHÁCH tải lên vào phiên — đường duy nhất để ảnh vào phiên.
+ *
+ * Hệ thống không nạp ảnh từ máy chụp nữa: quán tự đưa file ảnh cho khách,
+ * khách tải lên ở trang ghép khung. Nên chỉ nhận khi phiên đã chụp xong
+ * ('done'/'composed') — lúc đó khách mới có QR để vào trang ghép.
+ *
+ * Ghi 2 bản: ảnh gốc vào originals/ và bản thu nhỏ 1400px vào previews/.
+ * Điện thoại tải bản preview để ghép; server dựng lại ảnh nét từ bản gốc.
+ */
 export async function addPhoto(
   session: Session,
   data: Buffer,
-  source: 'manual' | 'agent' | 'guest' = 'manual',
-  sourceName?: string,
 ): Promise<{ photo: Photo; count: number; remaining: number }> {
-  /*
-   * Ảnh album của khách ('guest') đến SAU khi chụp xong — lúc khách cầm điện
-   * thoại ra ngoài ghép khung — nên chỉ nhận ở 'done'/'composed'. Ngược lại
-   * máy chụp chỉ được nạp khi phiên còn đang chụp.
-   */
-  const open = source === 'guest'
-    ? session.status === 'done' || session.status === 'composed'
-    : session.status === 'active' || session.status === 'shooting';
-  if (!open) {
+  if (session.status !== 'done' && session.status !== 'composed') {
     throw new CaptureError('Phiên không ở trạng thái nhận ảnh', 'closed');
   }
 
   /*
-   * Cùng một file gửi lại thì bỏ qua, không thêm bản sao.
-   *
-   * fs.watch bắn NHIỀU sự kiện cho một file (tạo, ghi, đóng) và agent còn
-   * có vòng quét định kỳ, nên cùng một ảnh dễ tới đây mấy lần. Trước đây
-   * chỉ intakeFromFolder lọc trùng, còn đường /api/capture thì không —
-   * khách thấy mỗi kiểu lặp ba lần.
+   * Trần ảnh của phiên giờ là trần số ảnh khách được tải lên — lưới an toàn
+   * cho ổ đĩa, không phải gói bán.
    */
-  if (sourceName) {
-    const dup = listPhotos(session.id).some((p) => p.sourceName === sourceName);
-    if (dup) throw new CaptureError('Ảnh này đã nạp rồi', 'duplicate');
-  }
-
-  /*
-   * Ảnh album có hạn mức RIÊNG cộng thêm trên trần của phiên. Trần kia là lưới
-   * an toàn cho việc quét thư mục chụp; nếu tính chung, khách chụp đủ trần sẽ
-   * không thêm nổi một ảnh album nào.
-   */
-  const limit = source === 'guest' ? session.max_photos + GUEST_EXTRA_PHOTOS : session.max_photos;
+  const limit = session.max_photos;
 
   // Giữ chỗ TRƯỚC khi xử lý ảnh — xem chú thích ở reserveSeq.
   const { id, seq } = reserveSeq(session.id, limit);
@@ -192,8 +164,8 @@ export async function addPhoto(
     width: meta.autoOrient?.width ?? meta.width,
     height: meta.autoOrient?.height ?? meta.height,
     bytes: data.length,
-    source,
-    sourceName: sourceName ?? null,
+    source: 'guest',
+    sourceName: null,
     created_at: now(),
   };
 
@@ -205,11 +177,6 @@ export async function addPhoto(
     photo.filename, photo.width, photo.height, photo.bytes,
     photo.source, photo.sourceName, id,
   );
-
-  // Ảnh đầu tiên -> chuyển sang 'shooting'
-  if (session.status === 'active') {
-    db.prepare(`UPDATE sessions SET status = 'shooting' WHERE id = ?`).run(session.id);
-  }
 
   const count = countPhotos(session.id);
   return { photo, count, remaining: Math.max(0, limit - count) };

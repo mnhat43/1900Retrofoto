@@ -8,7 +8,7 @@ const dir = mkdtempSync(join(tmpdir(), 'pb-capture-'));
 process.env.PHOTOBOOTH_DATA = dir;
 
 const { getDb, closeDb } = await import('./db.ts');
-const { createSession, claimSession } = await import('./session.ts');
+const { createSession, claimSession, setStatus, getById } = await import('./session.ts');
 const { addPhoto, listPhotos, countPhotos, CaptureError } = await import('./capture.ts');
 
 const jpeg = (w = 800, h = 600) =>
@@ -16,11 +16,13 @@ const jpeg = (w = 800, h = 600) =>
     .jpeg()
     .toBuffer();
 
+/** Phiên đã chụp xong — lúc khách có QR và được tải ảnh lên. */
 async function openSession(maxPhotos: number, room = '1') {
   const s = createSession({ maxPhotos });
   const r = claimSession(room, s.code);
   if (!r.ok) throw new Error('không mở được phiên');
-  return r.session;
+  setStatus(r.session.id, 'done');
+  return getById(r.session.id)!;
 }
 
 beforeEach(() => {
@@ -42,7 +44,7 @@ describe('addPhoto', () => {
     expect(b.remaining).toBe(2);
   });
 
-  it('chặn khi vượt số ảnh của gói', async () => {
+  it('chặn khi vượt trần ảnh của phiên', async () => {
     const s = await openSession(2);
     await addPhoto(s, await jpeg());
     await addPhoto(s, await jpeg());
@@ -54,7 +56,7 @@ describe('addPhoto', () => {
     await expect(addPhoto(s, Buffer.from('khong phai anh'))).rejects.toThrow(CaptureError);
   });
 
-  it('file hỏng KHÔNG chiếm mất lượt của gói', async () => {
+  it('file hỏng KHÔNG chiếm mất một chỗ trong trần', async () => {
     const s = await openSession(2);
     await addPhoto(s, await jpeg());
     await expect(addPhoto(s, Buffer.from('rac'))).rejects.toThrow();
@@ -70,6 +72,20 @@ describe('addPhoto', () => {
     await expect(addPhoto(s, await jpeg())).rejects.toThrow(CaptureError);
   });
 
+  it('phiên đang chụp (chưa hiện QR) thì cũng chưa nhận ảnh', async () => {
+    const s = createSession({ maxPhotos: 4 });
+    const r = claimSession('1', s.code);
+    if (!r.ok) throw new Error('không mở được phiên');
+    await expect(addPhoto(r.session, await jpeg())).rejects.toThrow(CaptureError);
+  });
+
+  it('ảnh luôn ghi nguồn là khách', async () => {
+    const s = await openSession(4);
+    const r = await addPhoto(s, await jpeg());
+    expect(r.photo.source).toBe('guest');
+    expect(listPhotos(s.id)[0].source).toBe('guest');
+  });
+
   it('lưu kích thước đã xoay theo EXIF', async () => {
     const s = await openSession(4);
     const r = await addPhoto(s, await jpeg(1600, 1200));
@@ -80,7 +96,7 @@ describe('addPhoto', () => {
 
 describe('nhiều ảnh gửi cùng lúc — chống mất ảnh', () => {
   /**
-   * Máy ảnh chụp liên tiếp gửi nhiều ảnh song song. Trước đây tất cả cùng đọc
+   * Khách chọn nhiều ảnh, hoặc mở hai tab, có thể gửi song song. Trước đây tất cả cùng đọc
    * số ảnh hiện có rồi tính ra cùng một seq, làm ảnh bị mất khi ghi database.
    * Test này chốt lại hành vi đúng.
    */
@@ -97,7 +113,7 @@ describe('nhiều ảnh gửi cùng lúc — chống mất ảnh', () => {
     expect(results.map((r) => r.photo.seq).sort()).toEqual([1, 2, 3, 4]);
   });
 
-  it('gửi song song nhiều hơn số ảnh của gói thì chỉ nhận đủ số cho phép', async () => {
+  it('gửi song song nhiều hơn trần thì chỉ nhận đủ số cho phép', async () => {
     const s = await openSession(3);
     const imgs = await Promise.all([jpeg(), jpeg(), jpeg(), jpeg(), jpeg()]);
 

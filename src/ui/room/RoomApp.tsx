@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  claimCode, roomSession, finishRoom, intakeRoom,
-  type SessionInfo, type PhotoInfo, type GuestQr, type IntakeResult, ApiError,
+  claimCode, roomSession, finishRoom,
+  type SessionInfo, type GuestQr, ApiError,
 } from '../../api';
 import './room.css';
 
@@ -10,9 +10,9 @@ import './room.css';
  *
  * Trạng thái: KHOÁ (nhập mã) -> ĐANG CHỤP -> XONG (mã QR ghép khung).
  *
- * Luồng lấy ảnh: mỗi phiên có thư mục riêng đặt tên bằng mã 4 số, tạo sẵn
- * lúc nhân viên tạo mã. Khách chụp xong bấm "Đã chụp xong", server quét đúng
- * thư mục ấy. Nhờ vậy ảnh không thể lẫn giữa các khách.
+ * Hệ thống KHÔNG lấy ảnh từ máy chụp: quán tự đưa file ảnh cho khách, khách
+ * quét QR rồi tự tải ảnh lên trang ghép khung. Màn này chỉ còn việc mở khoá
+ * phòng bằng mã và hiện QR khi khách chụp xong.
  *
  * Poll mỗi 2s thay vì websocket: dễ debug, sống sót qua ngủ/thức và LAN
  * chập chờn, 2s là không nhận ra được.
@@ -21,25 +21,17 @@ export default function RoomApp() {
   const room = new URLSearchParams(location.search).get('p') ?? '1';
 
   const [session, setSession] = useState<SessionInfo | null>(null);
-  const [photos, setPhotos] = useState<PhotoInfo[]>([]);
   const [qr, setQr] = useState<GuestQr | null>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [offline, setOffline] = useState(false);
-  const [captureOn, setCaptureOn] = useState(false);
-  /** Agent dang chay -> anh tu len, khach khong phai bam gi. */
-  const [agentOn, setAgentOn] = useState(false);
-  const [intake, setIntake] = useState<IntakeResult | null>(null);
 
   const refresh = useCallback(async () => {
     try {
       const r = await roomSession(room);
       setSession(r.session);
-      setPhotos(r.photos ?? []);
       setQr(r.qr ?? null);
-      setCaptureOn(!!r.captureEnabled);
-      setAgentOn(!!r.agent);
       setOffline(false);
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) setOffline(true);
@@ -59,7 +51,6 @@ export default function RoomApp() {
       const r = await claimCode(room, value);
       setSession(r.session);
       setCode('');
-      setIntake(null);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi');
@@ -77,13 +68,12 @@ export default function RoomApp() {
     if (next.length === 4) submitCode(next);
   }
 
-  /** Quét thư mục của phiên để nạp ảnh vừa chụp. */
-  async function onIntake() {
-    setBusy('Đang lấy ảnh...');
+  async function onFinish() {
+    setBusy('...');
     setError('');
     try {
-      const r = await intakeRoom(room);
-      setIntake(r);
+      const r = await finishRoom(room);
+      setQr(r.qr);
       await refresh();
     } catch {
       // Chi tiết lỗi không hiện cho khách — chỉ bật cờ để hiện lời nhắn chung
@@ -93,34 +83,7 @@ export default function RoomApp() {
     }
   }
 
-  async function onFinish() {
-    setBusy('...');
-    try {
-      const r = await finishRoom(room);
-      setQr(r.qr);
-      await refresh();
-    } finally {
-      setBusy('');
-    }
-  }
-
   const done = session?.status === 'done' || session?.status === 'composed';
-  const remaining = session ? session.maxPhotos - photos.length : 0;
-
-  /*
-   * Có lỗi thật sự cần gọi nhân viên hay không.
-   *
-   * "Quét mà chưa có ảnh nào" KHÔNG tính là lỗi khi khách chưa chụp xong —
-   * chỉ thành lỗi khi đã quét mà vẫn trắng tay, hoặc mất kết nối tới máy chủ.
-   *
-   * Thiếu thư mục chụp chỉ là lỗi khi KHÔNG có agent: chạy bằng agent thì
-   * ảnh tự chảy về, PHOTOBOOTH_CAPTURE để trống là đúng chứ không phải hỏng.
-   */
-  const problem =
-    (!captureOn && !agentOn) ||
-    offline ||
-    !!error ||
-    (!!intake && intake.found === 0 && photos.length === 0);
 
   /** Thanh trên — có ở MỌI màn để logo luôn hiện. */
   const Bar = ({ right }: { right?: React.ReactNode }) => (
@@ -145,14 +108,14 @@ export default function RoomApp() {
           </div>
 
           {/*
-            Chỉ một mã: ghép khung. Trong đó khách chọn ảnh vừa chụp hoặc
-            tải thêm ảnh từ album điện thoại.
+            Chỉ một mã: ghép khung. Ảnh do quán gửi cho khách (AirDrop,
+            Zalo...), khách tải lên từ album điện thoại rồi ghép.
           */}
           <div className="qr-row">
             <div className="qr-card primary">
               <img src={qr.compose} alt="QR ghép khung" />
               <h2>Ghép khung</h2>
-              <p>Chọn khung, chọn ảnh — có thể lấy thêm ảnh trong máy</p>
+              <p>Tải ảnh quán gửi bạn lên, chọn khung và ghép</p>
             </div>
           </div>
 
@@ -176,39 +139,21 @@ export default function RoomApp() {
 
   // ---- ĐANG CHỤP ----
   if (session) {
-    const hasPhotos = photos.length > 0;
     return (
       <div className="room">
         <Bar right={<span className="code-chip">{session.code}</span>} />
 
         <div className="room-main">
-          {/*
-            Chỉ hiện SỐ ẢNH ĐÃ CHỤP, không hiện "3/100".
-
-            Quán không bán gói theo số kiểu nữa; trần chỉ còn là lưới an toàn
-            của hệ thống. Chìa con số đó ra cho khách sẽ thành lời hứa hụt —
-            họ đọc "3/100" là tưởng còn 97 kiểu được chụp.
-
-            Cũng vì vậy mà bỏ luôn lưới ô trống: vẽ 100 ô chờ thì vừa vô nghĩa
-            vừa tràn màn hình.
-          */}
-          <div className="counter">
-            <div className="big">{photos.length}</div>
-            <p>
-              {!hasPhotos
-                ? 'Chụp xong thì bấm nút bên dưới'
-                : remaining > 0
-                  ? `Đã lấy ${photos.length} ảnh`
-                  : 'Đã đạt giới hạn ảnh của phiên'}
-            </p>
+          <div>
+            <h1>Chúc bạn chụp vui!</h1>
+            <p className="lead">Chụp xong thì bấm nút bên dưới để lấy mã QR ghép ảnh</p>
           </div>
 
           {/*
-            Màn này KHÁCH nhìn, không phải nhân viên — nên không lộ đường dẫn
-            thư mục hay tên biến cấu hình. Chi tiết kỹ thuật vẫn được ghi ở
-            console của server để nhân viên tra khi cần.
+            Màn này KHÁCH nhìn, không phải nhân viên — lỗi gì cũng chỉ hướng
+            sang nhân viên, không lộ chi tiết kỹ thuật.
           */}
-          {problem && !busy && (
+          {(offline || error) && !busy && (
             <div className="notice">
               <b>Hệ thống đang gặp lỗi</b>
               <span className="dim">Vui lòng liên hệ nhân viên để được hỗ trợ.</span>
@@ -216,27 +161,8 @@ export default function RoomApp() {
           )}
 
           <div className="actions">
-            {/*
-              Nút quét thư mục chỉ có nghĩa ở chế độ PHOTOBOOTH_CAPTURE.
-              Chạy bằng agent thì ảnh tự chảy về, bấm cũng không làm gì —
-              để lại chỉ khiến khách bấm rồi tưởng hỏng.
-            */}
-            {captureOn && (
-              <button
-                className="btn btn-primary"
-                disabled={!!busy || remaining <= 0}
-                onClick={onIntake}
-              >
-                {busy || (intake || hasPhotos ? 'Lấy thêm ảnh' : 'Đã chụp xong')}
-              </button>
-            )}
-
-            <button
-              className="btn btn-ghost"
-              disabled={!!busy || !hasPhotos}
-              onClick={onFinish}
-            >
-              Hiện mã QR
+            <button className="btn btn-primary" disabled={!!busy} onClick={onFinish}>
+              {busy || 'Đã chụp xong'}
             </button>
           </div>
         </div>

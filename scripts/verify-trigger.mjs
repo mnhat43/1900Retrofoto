@@ -1,8 +1,10 @@
 /**
  * Kiểm chứng tích hợp trigger LumaBooth.
  *
- * Điều phải đúng: ảnh chụp TRƯỚC khi LumaBooth mở lượt (session_start)
- * không được chảy vào phiên đang mở — đó là ảnh của khách trước về trễ.
+ * Hệ thống không lấy ảnh từ máy chụp nữa (quán tự đưa file cho khách), nên
+ * trigger chỉ còn MỘT việc: LumaBooth báo bắt đầu lượt chụp (session_start)
+ * thì server tự nhận hộ mã đang chờ của phòng đó — phòng chỉ có một màn hình
+ * và LumaBooth chiếm trọn, khách không có chỗ gõ 4 số.
  *
  *   node --experimental-strip-types scripts/verify-trigger.mjs
  */
@@ -40,109 +42,42 @@ async function api(path, opts = {}) {
   return { status: res.status, body: await res.json().catch(() => ({})) };
 }
 
-const BS = String.fromCharCode(92);
-const sharp = (await import('sharp')).default;
-const jpeg = () => sharp({ create: { width: 800, height: 600, channels: 3,
-  background: { r: 200, g: 60, b: 80 } } }).jpeg().toBuffer();
+/** Phòng đang có phiên nào, trạng thái gì (null = chưa ai nhận mã). */
+const roomStatus = async (room) =>
+  (await api(`/api/room/session?room=${room}`)).body.session?.status ?? null;
 
-async function send(room, mtime) {
-  const res = await fetch(`${BASE}/api/capture?room=${room}&source=agent&mtime=${mtime}`, {
-    method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: await jpeg(),
-  });
-  return { status: res.status, body: await res.json().catch(() => ({})) };
-}
-
-console.log('\nTrigger LumaBooth\n');
+const newCode = async (room) => (await api('/api/staff/sessions', {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ room }),
+})).body.code;
 
 await api('/api/staff/login', {
   method: 'POST', headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ password: 'test-secret' }),
 });
 
-// Mở phiên cho phòng 1
-const made = await api('/api/staff/sessions', {
-  method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ maxPhotos: 6, room: '1' }),
-});
-const code = made.body.code;
-await api('/api/room/claim', {
-  method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ room: '1', code }),
-});
-check('mở được phiên phòng 1', made.status === 200 && !!code);
+console.log('\n--- Tự nhận mã khi LumaBooth bắt đầu chụp ---');
+const code2 = await newCode('2');
+check('tạo được mã chờ cho phòng 2', /^\d{4}$/.test(code2 ?? ''));
+check('trước khi máy ảnh báo: phòng chưa ai nhận mã', (await roomStatus('2')) === null);
 
-// Chưa có trigger -> hành vi cũ, ảnh cũ vẫn nhận (agent chạy một mình)
-const noTrig = await send('1', Date.now() - 600_000);
-check('chưa có trigger thì vẫn nhận ảnh (tương thích ngược)', noTrig.status === 200,
-  JSON.stringify(noTrig.body));
-
-// LumaBooth mở lượt chụp
-const t = await api('/api/trigger?room=1&event_type=session_start&param1=PrintAndGIF');
-check('nhận được trigger session_start', t.status === 200);
-
-// Ảnh cũ hơn mốc lượt -> phải bị từ chối
-const stale = await send('1', Date.now() - 600_000);
-check('BỎ ảnh của lượt trước về trễ',
-  stale.status === 409 && stale.body.reason === 'stale', JSON.stringify(stale.body));
-
-// Ảnh mới -> nhận
-const fresh = await send('1', Date.now());
-check('NHẬN ảnh chụp trong lượt hiện tại', fresh.status === 200, JSON.stringify(fresh.body));
-
-// Đóng lượt -> trở lại hành vi cũ
-await api('/api/trigger?room=1&event_type=session_end');
-const after = await send('1', Date.now() - 600_000);
-check('đóng lượt thì hết lọc', after.status === 200, JSON.stringify(after.body));
-
-// Luồng THẬT quan sát được từ LumaBooth 8: processing_start gửi mỗi ảnh
-// một param, param cuối là đường dẫn đầy đủ của file đã ghép.
-await api('/api/trigger?room=1&event_type=session_start&param1=PrintAndGIF');
-const proc = await api(
-  '/api/trigger?room=1&event_type=processing_start' +
-  '&param1=20260912_112854_324.jpg&param2=20260912_112902_922.jpg' +
-  '&param3=20260912_112910_404.jpg&param4=20260912_112917_855.jpg' +
-  '&param5=' + encodeURIComponent(['C:','dslrBooth','test','Prints','20260912_112921_379.jpg'].join(BS)),
-);
-check('nhận processing_start nhiều param', proc.status === 200);
-const { shotForRoom } = await import('../server/trigger.ts');
-const shot = shotForRoom('1');
-check('gom đúng 4 ảnh gốc, bỏ đường dẫn file ghép',
-  shot?.files.size === 4 && shot.files.has('20260912_112854_324.jpg') &&
-  ![...shot.files].some((f) => f.includes('Prints')),
-  JSON.stringify([...(shot?.files ?? [])]));
-await api('/api/trigger?room=1&event_type=session_end');
-
-// TỰ NHẬN MÃ: phòng một màn hình, khách không gõ được 4 số.
-// Nhân viên tạo mã -> LumaBooth báo bắt đầu chụp -> server tự nhận hộ.
-const made2 = await api('/api/staff/sessions', {
-  method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ maxPhotos: 4, room: '2' }),
-});
-check('tạo được mã chờ cho phòng 2', made2.status === 200 && !!made2.body.code);
-
-// Chưa ai nhập mã -> chưa gửi ảnh được
-const before = await send('2', Date.now());
-check('trước khi máy ảnh báo: phòng chưa mở khoá', before.status === 409);
-
-// LumaBooth bắt đầu chụp -> server tự nhận mã
 await api('/api/trigger?room=2&event_type=session_start&param1=PrintAndGIF');
-const after2 = await send('2', Date.now());
-check('máy ảnh bắt đầu chụp -> TỰ nhận mã, ảnh vào được',
-  after2.status === 200, JSON.stringify(after2.body));
+check('máy ảnh bắt đầu chụp -> TỰ nhận mã', (await roomStatus('2')) === 'active');
+
+const fin = await api('/api/room/finish?room=2', { method: 'POST' });
+check('phiên tự nhận vẫn hiện được QR như thường', fin.status === 200 && !!fin.body.qr?.composeUrl);
 
 // Không có mã chờ thì không làm gì, không đổ server
 const t3 = await api('/api/trigger?room=3&event_type=session_start&param1=Print');
-check('phòng không có mã chờ: bỏ qua êm', t3.status === 200);
+check('phòng không có mã chờ: bỏ qua êm', t3.status === 200 && (await roomStatus('3')) === null);
 
-// CỔNG RIÊNG MỖI PHÒNG: LumaBooth vứt đường dẫn và tham số, chỉ giữ
-// host:cổng — nên cổng là thứ duy nhất nói lên phòng nào gọi. Quan sát
-// từ LumaBooth 8 thật: nó gọi GET /?event_type=...&param1=...
+console.log('\n--- Cổng riêng mỗi phòng ---');
+// LumaBooth vứt đường dẫn và tham số, chỉ giữ host:cổng — nên cổng là thứ
+// duy nhất nói lên phòng nào gọi. Quan sát từ LumaBooth 8 thật: nó gọi
+// GET /?event_type=...&param1=...
 const base = Number(process.env.PHOTOBOOTH_TRIGGER_BASE ?? 8100);
-const made3 = await api('/api/staff/sessions', {
-  method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ maxPhotos: 4, room: '3' }),
-});
-check('tạo được mã chờ cho phòng 3', made3.status === 200 && !!made3.body.code);
+const code3 = await newCode('3');
+check('tạo được mã chờ cho phòng 3', /^\d{4}$/.test(code3 ?? ''));
 
 const viaPort = await fetch(
   'http://127.0.0.1:' + (base + 3) + '/?event_type=session_start&param1=OnlyGIF',
@@ -150,36 +85,14 @@ const viaPort = await fetch(
 check('cổng riêng của phòng 3 nhận được trigger', viaPort === 200, String(viaPort));
 
 await new Promise((r) => setTimeout(r, 300));
-const p3 = await send('3', Date.now());
-check('gọi qua cổng riêng cũng TỰ nhận mã', p3.status === 200, JSON.stringify(p3.body));
+check('gọi qua cổng riêng cũng TỰ nhận mã', (await roomStatus('3')) === 'active');
 
-// KHÔNG ĐƯỢC NHÂN BẢN: fs.watch bắn nhiều sự kiện cho một file, agent còn
-// quét định kỳ — cùng một ảnh dễ gửi lên mấy lần. Khách từng thấy mỗi kiểu
-// lặp ba lần vì /api/capture không lọc theo tên file.
-const made4 = await api('/api/staff/sessions', {
-  method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ maxPhotos: 6, room: '2' }),
-});
-await api('/api/room/claim', {
-  method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ room: '2', code: made4.body.code }),
-});
-
-async function sendNamed(room, name) {
-  const res = await fetch(
-    BASE + '/api/capture?room=' + room + '&source=agent&name=' + encodeURIComponent(name),
-    { method: 'POST', headers: { 'content-type': 'image/jpeg' }, body: await jpeg() },
-  );
-  return { status: res.status, body: await res.json().catch(() => ({})) };
-}
-
-const one = await sendNamed('2', 'IMG_0001.JPG');
-check('ảnh đầu tiên vào được', one.status === 200, JSON.stringify(one.body));
-const again = await sendNamed('2', 'IMG_0001.JPG');
-check('gửi LẠI cùng tên file thì bị từ chối',
-  again.status === 409 && again.body.reason === 'duplicate', JSON.stringify(again.body));
-const other = await sendNamed('2', 'IMG_0002.JPG');
-check('ảnh khác tên vẫn vào bình thường', other.status === 200, JSON.stringify(other.body));
+// Các sự kiện khác chỉ ghi log — không được đụng vào phiên
+await fetch('http://127.0.0.1:' + (base + 3) + '/?event_type=file_download&param1=IMG_1.JPG')
+  .catch(() => {});
+await fetch('http://127.0.0.1:' + (base + 3) + '/?event_type=session_end').catch(() => {});
+await new Promise((r) => setTimeout(r, 300));
+check('sự kiện khác không đổi trạng thái phiên', (await roomStatus('3')) === 'active');
 
 // Phòng lạ / sự kiện lạ không được làm server đổ
 const bad = await api('/api/trigger?room=99&event_type=linh_tinh');

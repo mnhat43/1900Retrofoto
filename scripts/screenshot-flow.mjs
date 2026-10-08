@@ -1,14 +1,12 @@
 /** Chụp màn hình từng bước để xem bằng mắt. */
 import { chromium } from 'playwright';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 mkdirSync('scratch', { recursive: true });
 const dataDir = mkdtempSync(join(tmpdir(), 'pb-shot-'));
-const captureRoot = mkdtempSync(join(tmpdir(), 'pb-shotcap-'));
 process.env.PHOTOBOOTH_DATA = dataDir;
-process.env.PHOTOBOOTH_CAPTURE = captureRoot;
 process.env.PHOTOBOOTH_PASSWORD = 'test-secret';
 process.env.PHOTOBOOTH_PORT = '8197';
 process.env.PHOTOBOOTH_HOST = '127.0.0.1:8197';
@@ -48,7 +46,8 @@ await shot(room, 'flow-3-room-locked');
 await room.reload();
 await room.waitForSelector('.keypad');
 for (const d of code) await room.click(`.keypad button:text-is("${d}")`);
-await room.waitForSelector('.counter');
+await room.waitForSelector('button:has-text("Đã chụp xong")');
+await shot(room, 'flow-4-room-shooting');
 
 const sharp = (await import('sharp')).default;
 const colors = [
@@ -64,22 +63,7 @@ for (let i = 0; i < 4; i++) {
     }).jpeg().toBuffer(),
   });
 }
-const shotDir = join(captureRoot, code);
-mkdirSync(shotDir, { recursive: true });
-for (let i = 0; i < 2; i++) writeFileSync(join(shotDir, `IMG_${i + 1}.jpg`), files[i].buffer);
 await room.click('.btn:has-text("Đã chụp xong")');
-// Bo dem chi con so anh da chup (bo luoi o trong va "x/N")
-await room.waitForFunction(
-  () => document.querySelector('.counter .big')?.textContent?.trim() === '2',
-);
-await shot(room, 'flow-4-room-shooting');
-
-for (let i = 2; i < 4; i++) writeFileSync(join(shotDir, `IMG_${i + 1}.jpg`), files[i].buffer);
-await room.click('.btn:has-text("Lấy thêm ảnh")');
-await room.waitForFunction(
-  () => document.querySelector('.counter .big')?.textContent?.trim() === '4',
-);
-await room.click('.btn:has-text("Hiện mã QR")');
 await room.waitForSelector('.qr-card');
 await shot(room, 'flow-5-room-qr');
 
@@ -99,12 +83,12 @@ await shot(phone, 'flow-6-phone-frames');
 
 await phone.click('.frame-item:has-text("Basic 4")');
 await phone.waitForSelector('.photo-grid');
-await phone.click('button.photo >> nth=0');
-await phone.click('button.photo >> nth=1');
+await shot(phone, 'flow-7a-phone-empty');
+// Khách tải ảnh quán gửi lên — ảnh vừa tải tự được chọn vào ô
+await phone.setInputFiles('.photo.add input[type=file]', files);
+await phone.waitForFunction(() => document.querySelectorAll('button.photo').length === 4);
 await shot(phone, 'flow-7-phone-pick');
 
-await phone.click('button.photo >> nth=2');
-await phone.click('button.photo >> nth=3');
 await phone.click('.actions .btn-primary');
 await phone.waitForSelector('.strip-canvas');
 await phone.waitForTimeout(800);
@@ -137,11 +121,10 @@ await phone.waitForSelector('.sheet');
 await phone.waitForTimeout(400);
 await shot(phone, 'flow-11-phone-sheet');
 
-console.log('da chup 11 man hinh vao scratch/');
+console.log('da chup 12 man hinh vao scratch/');
 
 await browser.close();
 server.close();
 const { closeDb } = await import('../server/db.ts');
 closeDb();
 rmSync(dataDir, { recursive: true, force: true });
-rmSync(captureRoot, { recursive: true, force: true });

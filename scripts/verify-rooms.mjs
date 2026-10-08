@@ -13,9 +13,7 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 
 const dataDir = mkdtempSync(join(tmpdir(), 'pb-rm-'));
-const captureRoot = mkdtempSync(join(tmpdir(), 'pb-rmcap-'));
 process.env.PHOTOBOOTH_DATA = dataDir;
-process.env.PHOTOBOOTH_CAPTURE = captureRoot;
 process.env.PHOTOBOOTH_PASSWORD = 't';
 process.env.PHOTOBOOTH_PORT = '8191';
 process.env.PHOTOBOOTH_HOST = '127.0.0.1:8191';
@@ -239,7 +237,6 @@ await browser.close();
 server.close();
 (await import('../server/db.ts')).closeDb();
 rmSync(dataDir, { recursive: true, force: true });
-rmSync(captureRoot, { recursive: true, force: true });
 
 console.log(fails.length ? `\nFAIL: ${fails.length} kiểm tra\n` : '\nOK — quy tắc mỗi phòng một phiên chạy đúng.\n');
 process.exit(fails.length ? 1 : 0);

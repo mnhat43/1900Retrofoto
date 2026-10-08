@@ -2,22 +2,20 @@
  * Kiểm chứng TRỌN LUỒNG bằng trình duyệt thật, trên server thật.
  *
  * Đi đúng đường người dùng đi:
- *   NV đăng nhập -> tạo mã -> phòng nhập mã -> upload ảnh -> hiện QR
- *   -> khách quét QR -> chọn khung -> chọn ảnh -> ghép -> lưu -> tải về
+ *   NV đăng nhập -> tạo mã -> phòng nhập mã -> chụp xong, hiện QR
+ *   -> khách quét QR -> chọn khung -> tải ảnh quán gửi lên -> ghép -> lưu -> tải về
  *
  * Chạy trên bản build thật (dist/), không phải dev server.
  *
  *   npm run build && node scripts/verify-flow.mjs
  */
 import { chromium } from 'playwright';
-import { mkdtempSync, rmSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const dataDir = mkdtempSync(join(tmpdir(), 'pb-flow-'));
-const captureRoot = mkdtempSync(join(tmpdir(), 'pb-flowcap-'));
 process.env.PHOTOBOOTH_DATA = dataDir;
-process.env.PHOTOBOOTH_CAPTURE = captureRoot;
 process.env.PHOTOBOOTH_PASSWORD = 'test-secret';
 process.env.PHOTOBOOTH_PORT = '8198';
 process.env.PHOTOBOOTH_HOST = '127.0.0.1:8198';
@@ -67,41 +65,19 @@ await room.waitForSelector('.keypad', { timeout: 10000 });
 check('phòng khoá cho tới khi nhập mã', await room.isVisible('.keypad'));
 
 for (const d of code) await room.click(`.keypad button:text-is("${d}")`);
-await room.waitForSelector('.counter', { timeout: 10000 });
-check('mã đúng thì mở khoá phòng', await room.isVisible('.counter'));
+await room.waitForSelector('button:has-text("Đã chụp xong")', { timeout: 10000 });
+check('mã đúng thì mở khoá phòng', await room.isVisible('button:has-text("Đã chụp xong")'));
 
-// Giả lập máy ảnh đổ ảnh vào thư mục của phiên, rồi bấm "Đã chụp xong".
-// Đây là luồng thật duy nhất — nút thêm ảnh tay đã bỏ.
-const sharp = (await import('sharp')).default;
-const colors = [
-  { r: 220, g: 40, b: 70 }, { r: 40, g: 140, b: 220 },
-  { r: 50, g: 190, b: 100 }, { r: 240, g: 175, b: 45 },
-];
-const shotDir = join(captureRoot, code);
-mkdirSync(shotDir, { recursive: true });
-for (let i = 0; i < 4; i++) {
-  writeFileSync(
-    join(shotDir, `IMG_${i + 1}.jpg`),
-    await sharp({
-      create: { width: 1600, height: 1200, channels: 3, background: colors[i] },
-    }).jpeg().toBuffer(),
-  );
-}
+/*
+ * Hệ thống KHÔNG lấy ảnh từ máy chụp nữa: quán tự đưa file cho khách. Màn
+ * phòng chỉ còn một nút, không đếm ảnh, không quét thư mục.
+ */
+check('màn phòng KHÔNG còn đếm ảnh chụp', (await room.locator('.counter').count()) === 0);
+check('KHÔNG còn nút lấy thêm ảnh / thêm ảnh tay',
+  (await room.locator('button:has-text("Lấy thêm ảnh")').count()) === 0 &&
+  (await room.locator('button:has-text("Thêm ảnh tay")').count()) === 0);
 
 await room.click('.btn:has-text("Đã chụp xong")');
-// Màn phòng giờ chỉ hiện SỐ ẢNH ĐÃ CHỤP, không còn lưới ô trống và không
-// còn "4/8" — trần ảnh là lưới an toàn của hệ thống, không phải gói khách mua
-await room.waitForFunction(
-  () => document.querySelector('.counter .big')?.textContent?.trim() === '4',
-  { timeout: 20000 },
-);
-check('bấm "Đã chụp xong" thì lấy đủ 4 ảnh từ thư mục', true);
-check('màn phòng KHÔNG hiện trần ảnh cho khách',
-  !(await room.textContent('.counter'))?.includes('/'));
-check('KHÔNG còn nút thêm ảnh tay',
-  !(await room.isVisible('button:has-text("Thêm ảnh tay")')));
-
-await room.click('.btn:has-text("Hiện mã QR")');
 await room.waitForSelector('.qr-card', { timeout: 10000 });
 check('chỉ còn 1 mã QR (ghép khung)', (await room.locator('.qr-card').count()) === 1);
 check('có nhắc tải ảnh trước khi về',
@@ -127,33 +103,50 @@ phone.on('pageerror', (e) => errors.push(`phone: ${e.message}`));
 await phone.goto(composeUrl);
 await phone.waitForSelector('.frame-grid', { timeout: 15000 });
 
-// Hiện CẢ khung nhiều ô hơn số ảnh (4 ảnh vẫn thấy khung 6/9 ô) — khách bù
-// bằng ảnh trong album điện thoại.
+const sharp = (await import('sharp')).default;
 const frameCount = await phone.locator('.frame-item').count();
-check('hiện cả khung nhiều ô hơn số ảnh đang có',
-  (await phone.locator('.frame-item:has-text("Basic 6")').count()) === 1,
+check('hiện đủ các khung', (await phone.locator('.frame-item:has-text("Basic 6")').count()) === 1,
   `${frameCount} khung`);
 
 await phone.click('.frame-item:has-text("Basic 4")');
 await phone.waitForSelector('.photo-grid', { timeout: 10000 });
 
-// Chưa chọn ảnh nào -> chưa cho đi tiếp; chọn 1–2 tấm là đi tiếp được
-// (khung nhiều ô không bắt chọn đủ một lượt, ô trống bù sau trong màn chỉnh)
-check('chưa chọn ảnh nào thì chưa cho đi tiếp',
+// Ảnh máy chụp không về hệ thống — khách mở ra là lưới trống, chỉ có ô tải lên
+check('KHÔNG hiện ảnh máy chụp nào', (await phone.locator('button.photo').count()) === 0);
+check('có ô "Tải ảnh lên" ở đầu lưới', await phone.isVisible('.photo-grid > .photo.add:first-child'));
+check('nhắc khách tải ảnh quán đã gửi',
+  (await phone.textContent('.lead'))?.includes('Tải ảnh lên'), await phone.textContent('.lead'));
+check('chưa có ảnh nào thì chưa cho đi tiếp',
   await phone.isDisabled('.actions .btn-primary'));
-await phone.click('button.photo >> nth=0');
-await phone.click('button.photo >> nth=1');
+
+const colors = [
+  { r: 220, g: 40, b: 70 }, { r: 40, g: 140, b: 220 },
+  { r: 50, g: 190, b: 100 }, { r: 240, g: 175, b: 45 },
+];
+/*
+ * Tấm đầu cỡ ảnh Canon thật (6000x4000, 24MP): quán gửi qua Google Drive nên
+ * khách có đúng file gốc, và file đó phải lên server NGUYÊN VẸN — không bị
+ * điện thoại thu nhỏ/nén lại (xem prepareUpload).
+ */
+const shopFile = async (i) => ({
+  name: `IMG_${i + 1}.jpg`, mimeType: 'image/jpeg',
+  buffer: await sharp({
+    create: i === 0
+      ? { width: 6000, height: 4000, channels: 3, background: colors[i] }
+      : { width: 1600, height: 1200, channels: 3, background: colors[i] },
+  }).jpeg({ quality: 95 }).toBuffer(),
+});
+const canonShot = await shopFile(0);
+// Tải 2 tấm trước: chọn thiếu vẫn được đi tiếp (ô trống bù sau trong màn chỉnh)
+await phone.setInputFiles('.photo.add input[type=file]', [canonShot, await shopFile(1)]);
+await phone.waitForFunction(() => document.querySelectorAll('button.photo').length === 2, { timeout: 20000 });
+check('ảnh vừa tải lên được chọn sẵn', (await phone.locator('button.photo.on').count()) === 2);
 check('chọn thiếu ảnh vẫn cho đi tiếp',
   !(await phone.isDisabled('.actions .btn-primary')));
 
-await phone.click('button.photo >> nth=2');
-await phone.click('button.photo >> nth=3');
-check('chọn đủ ảnh thì mở nút tiếp tục',
-  !(await phone.isDisabled('.actions .btn-primary')));
-
-// Chọn thừa -> không nhận thêm
-const before = await phone.locator('.photo.on').count();
-check('không cho chọn quá số ô của khung', before === 4, `${before}`);
+await phone.setInputFiles('.photo.add input[type=file]', [await shopFile(2), await shopFile(3)]);
+await phone.waitForFunction(() => document.querySelectorAll('button.photo').length === 4, { timeout: 20000 });
+check('đủ 4 ảnh thì đủ ô', (await phone.locator('.photo.on').count()) === 4);
 
 await phone.click('.actions .btn-primary');
 await phone.waitForSelector('.strip-canvas', { timeout: 20000 });
@@ -210,6 +203,12 @@ check('tạo thư mục theo ngày', dirs.length === 1, dirs.join(','));
 const sessionDir = join(dataDir, dirs[0], code);
 check('thư mục đặt theo mã phiên', existsSync(sessionDir), sessionDir);
 check('có ảnh gốc', readdirSync(join(sessionDir, 'originals')).length === 4);
+const stored = readFileSync(join(sessionDir, 'originals', '01.jpg'));
+check('ảnh JPEG khách tải lên được lưu NGUYÊN FILE (trùng từng byte)',
+  stored.equals(canonShot.buffer), `${stored.length} vs ${canonShot.buffer.length} byte`);
+const storedMeta = await sharp(stored).metadata();
+check('ảnh 24MP không bị thu nhỏ', storedMeta.width === 6000 && storedMeta.height === 4000,
+  `${storedMeta.width}x${storedMeta.height}`);
 check('có ảnh proxy', readdirSync(join(sessionDir, 'previews')).length === 4);
 const strips = readdirSync(join(sessionDir, 'strips'));
 check('có ảnh đã ghép khung', strips.length === 1, strips.join(','));
@@ -245,7 +244,7 @@ await phone.goto(composeUrl);
 await phone.waitForSelector('.frame-grid', { timeout: 15000 });
 await phone.click('.frame-item:has-text("Basic 6")');
 await phone.waitForSelector('.photo-grid', { timeout: 10000 });
-check('có ô "Ảnh trong máy" ở đầu lưới',
+check('lần sau vẫn có ô "Tải ảnh lên" ở đầu lưới',
   await phone.isVisible('.photo-grid > .photo.add:first-child'));
 check('nhắc khách chọn ảnh',
   (await phone.textContent('.lead'))?.includes('Chạm chọn ảnh'));
@@ -352,7 +351,6 @@ server.close();
 const { closeDb } = await import('../server/db.ts');
 closeDb();
 rmSync(dataDir, { recursive: true, force: true });
-rmSync(captureRoot, { recursive: true, force: true });
 
 console.log(fails.length
   ? `\nFAIL: ${fails.length} kiểm tra\n${fails.map((f) => ' - ' + f).join('\n')}\n`

@@ -9,14 +9,12 @@
  *   node scripts/verify-noscroll.mjs
  */
 import { chromium, devices } from 'playwright';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const dataDir = mkdtempSync(join(tmpdir(), 'pb-ns-'));
-const captureRoot = mkdtempSync(join(tmpdir(), 'pb-nscap-'));
 process.env.PHOTOBOOTH_DATA = dataDir;
-process.env.PHOTOBOOTH_CAPTURE = captureRoot;
 process.env.PHOTOBOOTH_PASSWORD = 't';
 process.env.PHOTOBOOTH_PORT = '8186';
 process.env.PHOTOBOOTH_HOST = '127.0.0.1:8186';
@@ -91,7 +89,7 @@ for (const [label, w, h] of [
   await checkBrand(p, `nhập mã ${label}`, 21);
 
   await p.goto(`${BASE}/room?p=1`);
-  await p.waitForSelector('.counter');
+  await p.waitForSelector('button:has-text("Đã chụp xong")');
   await p.waitForTimeout(300);
   check(`đang chụp ${label} không cuộn`, (await scrollY(p)) <= SLOP, `${await scrollY(p)}px`);
   check(`đang chụp ${label} có logo`, await p.isVisible('.brand'));
@@ -99,14 +97,15 @@ for (const [label, w, h] of [
   await p.close();
 }
 
-// Chụp đủ 12 ảnh rồi kiểm màn QR
-mkdirSync(join(captureRoot, s1.code), { recursive: true });
+// Chụp xong rồi kiểm màn QR; khách tải 12 ảnh lên để màn điện thoại có lưới đầy
+const fin1 = await api('/api/room/finish?room=1', { method: 'POST' });
+const tok1 = fin1.qr.composeUrl.split('/c/')[1];
 for (let i = 0; i < 12; i++) {
-  writeFileSync(join(captureRoot, s1.code, `I${i}.jpg`),
-    await jpeg({ r: 200, g: 60 + i * 10, b: 90 }));
+  await api(`/api/s/photos?t=${tok1}`, {
+    method: 'POST', headers: { 'content-type': 'image/jpeg' },
+    body: await jpeg({ r: 200, g: 60 + i * 10, b: 90 }),
+  });
 }
-await api('/api/room/intake?room=1', { method: 'POST' });
-await api('/api/room/finish?room=1', { method: 'POST' });
 
 for (const [label, w, h] of [['1920x1080', 1920, 1080], ['1366x768 (laptop thấp)', 1366, 768]]) {
   const p = await browser.newPage({ viewport: { width: w, height: h } });
@@ -377,7 +376,6 @@ await browser.close();
 server.close();
 (await import('../server/db.ts')).closeDb();
 rmSync(dataDir, { recursive: true, force: true });
-rmSync(captureRoot, { recursive: true, force: true });
 
 console.log(fails.length ? `\nFAIL: ${fails.length} kiểm tra\n` : '\nOK — không màn nào bị cuộn ngoài ý muốn.\n');
 process.exit(fails.length ? 1 : 0);
