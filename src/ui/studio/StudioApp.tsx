@@ -183,6 +183,7 @@ export default function StudioApp() {
    */
   async function startEdit() {
     if (!frame || chosen.length === 0) return;
+    setNotice('');
     setBusy('Đang tải ảnh...');
     try {
       await ensureLoaded(chosen);
@@ -204,8 +205,8 @@ export default function StudioApp() {
       setSwapFrom(null);
       setStep('edit');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được ảnh');
-      setStep('error');
+      // Ở lại bước chọn ảnh, giữ nguyên ảnh đã chọn — lỗi mạng thì bấm lại là được.
+      setNotice(e instanceof Error ? e.message : 'Không tải được ảnh');
     } finally {
       setBusy('');
     }
@@ -214,6 +215,7 @@ export default function StudioApp() {
   /** Render trên máy khách rồi gửi lên server. */
   async function onSave() {
     if (!frame) return;
+    setNotice('');
     setBusy('Đang lưu...');
     try {
       const state = { frame, contents, photos, color: NO_COLOR };
@@ -233,8 +235,8 @@ export default function StudioApp() {
       setResult({ composite: r.composite, blob });
       setStep('saved');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Lưu thất bại');
-      setStep('error');
+      // Ở lại màn chỉnh: chuyển sang trang lỗi là mất hết công căn ảnh của khách.
+      setNotice(e instanceof Error ? e.message : 'Lưu thất bại');
     } finally {
       setBusy('');
     }
@@ -267,12 +269,11 @@ export default function StudioApp() {
             <p className="muted small" style={{ marginTop: 12 }}>
               Liên kết chỉ dùng được khi điện thoại đang nối WiFi cửa hàng.
             </p>
-            {session && (
-              <button className="btn btn-ghost wide" style={{ marginTop: 16 }}
-                onClick={() => location.reload()}>
-                Thử lại
-              </button>
-            )}
+            {/* Luôn có nút: mở trang lúc WiFi chập chờn thì tải lại là xong. */}
+            <button className="btn btn-ghost wide" style={{ marginTop: 16 }}
+              onClick={() => location.reload()}>
+              Thử lại
+            </button>
           </div>
         </div>
       </div>
@@ -764,6 +765,7 @@ export default function StudioApp() {
         </div>
 
         <div className="actions">
+          {notice && !picker && <p className="notice-inline">{notice}</p>}
           <button className="btn btn-primary wide" disabled={!!busy || missing > 0} onClick={onSave}>
             {busy || (missing > 0 ? `Còn ${missing} ô trống` : 'Hoàn thiện & Lưu')}
           </button>

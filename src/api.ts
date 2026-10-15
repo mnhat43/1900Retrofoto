@@ -48,15 +48,24 @@ export class ApiError extends Error {
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const lost = () => new ApiError('Mất kết nối tới máy chủ. Kiểm tra WiFi rồi thử lại.', 0);
   let res: Response;
   try {
     res = await fetch(path, init);
   } catch {
     // Mất mạng giữa chừng — báo rõ thay vì để treo im lặng
-    throw new ApiError('Mất kết nối tới máy chủ. Kiểm tra WiFi rồi thử lại.', 0);
+    throw lost();
   }
   const ct = res.headers.get('content-type') ?? '';
-  const body = ct.includes('json') ? await res.json() : null;
+  let body = null;
+  if (ct.includes('json')) {
+    try {
+      body = await res.json();
+    } catch {
+      // Kết nối đứt khi đang đọc dở body: Safari ném TypeError trần ("Type error").
+      if (res.ok) throw lost();
+    }
+  }
   if (!res.ok) {
     throw new ApiError(body?.error ?? `Lỗi ${res.status}`, res.status, body?.reason);
   }

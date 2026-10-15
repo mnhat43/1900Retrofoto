@@ -77,9 +77,54 @@ export async function loadPhotoFromUrl(
   id: string = uid(),
   thumbUrl: string = url,
 ): Promise<Photo> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Không tải được ảnh (${res.status})`);
-  return fromBlob(await res.blob(), id, thumbUrl);
+  return fromBlob(await fetchBlob(url), id, thumbUrl);
+}
+
+/** Lời nhắn cho khách khi đã thử lại mà vẫn không tải được ảnh. */
+export const LOAD_FAILED = 'Mạng chập chờn, chưa tải được ảnh. Kiểm tra WiFi cửa hàng rồi thử lại.';
+
+/** Chờ trước mỗi lần thử lại — WiFi quán chập chờn thường hồi lại sau ~1 giây. */
+const RETRY_DELAYS_MS = [400, 1200];
+
+type FetchBlobOptions = {
+  fetchImpl?: typeof fetch;
+  delays?: number[];
+  sleep?: (ms: number) => Promise<void>;
+};
+
+/**
+ * Tải một ảnh về thành Blob, tự thử lại khi mạng lỗi.
+ *
+ * Safari ném TypeError trần ("Load failed", "Type error") khi WiFi chập
+ * chờn, khi máy đổi sóng, hoặc khi khách vừa chuyển sang app khác (Drive,
+ * Zalo) lấy ảnh rồi quay lại — iOS cắt các kết nối đang dở của trang. Lỗi
+ * này lọt thẳng ra màn hình nếu không bắt, mà thường chỉ cần tải lại là được.
+ *
+ * Chỉ thử lại lỗi mạng và 5xx. 4xx (ảnh không có, hết quyền) thử bao nhiêu
+ * lần cũng vậy.
+ */
+export async function fetchBlob(
+  url: string,
+  {
+    fetchImpl = fetch,
+    delays = RETRY_DELAYS_MS,
+    sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  }: FetchBlobOptions = {},
+): Promise<Blob> {
+  for (let attempt = 0; ; attempt++) {
+    let status = 0;
+    try {
+      const res = await fetchImpl(url);
+      status = res.status;
+      // Đọc body cũng nằm trong try: kết nối hay đứt đúng lúc đang tải dở ảnh.
+      if (res.ok) return await res.blob();
+    } catch {
+      // Lỗi mạng — rơi xuống thử lại.
+    }
+    if (status >= 400 && status < 500) throw new Error(`Không tải được ảnh (${status})`);
+    if (attempt >= delays.length) throw new Error(LOAD_FAILED);
+    await sleep(delays[attempt]);
+  }
 }
 
 /** Giải phóng ảnh — đóng bitmap và thu hồi object URL nếu có. */
@@ -123,11 +168,7 @@ export async function loadPhotosFromUrls(
   for (let i = 0; i < items.length; i += BATCH) {
     const batch = items.slice(i, i + BATCH);
     const blobs = await Promise.all(
-      batch.map(async (it) => {
-        const res = await fetch(it.url);
-        if (!res.ok) throw new Error(`Không tải được ảnh (${res.status})`);
-        return { blob: await res.blob(), ...it };
-      }),
+      batch.map(async (it) => ({ blob: await fetchBlob(it.url), ...it })),
     );
     for (const b of blobs) {
       out.push(await fromBlob(b.blob, b.id, b.url));
